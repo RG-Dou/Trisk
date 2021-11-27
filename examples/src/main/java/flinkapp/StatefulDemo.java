@@ -22,7 +22,7 @@ import java.io.FileOutputStream;
 public class StatefulDemo {
 
     //    private static final int MAX = 1000000 * 10;
-    private static final int MAX = 50000;
+    private static final int MAX = 100000;
     private static final int NUM_LETTERS = 1000;
 
     public static void main(String[] args) throws Exception {
@@ -35,17 +35,17 @@ public class StatefulDemo {
 //                "localhost:9092", "my-flink-demo-topic0", new SimpleStringSchema());
 //        kafkaProducer.setWriteTimestampToKafka(true);
 
-        env.addSource(new MySource())
+        env.addSource(new MySource()).setParallelism(1)
                 .keyBy(0)
                 .map(new MyStatefulMap())
                 .disableChaining()
                 .name("Splitter FlatMap")
                 .uid("flatmap")
-                .setParallelism(2)
+                .setParallelism(3)
                 .keyBy((KeySelector<String, Object>) s -> s)
                 .filter(input -> Integer.parseInt(input.split(" ")[1]) >= MAX)
-                .name("filter")
-                .map(new Tokenizer())
+                .name("filter").setParallelism(3)
+                .map(new Tokenizer()).setParallelism(3)
                 .keyBy(0)
                 .sum(1)
                 .print();
