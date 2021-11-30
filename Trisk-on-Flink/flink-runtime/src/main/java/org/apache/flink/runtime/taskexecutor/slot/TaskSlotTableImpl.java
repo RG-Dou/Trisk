@@ -555,6 +555,12 @@ public class TaskSlotTableImpl<T extends TaskSlotPayload> implements TaskSlotTab
 		}
 	}
 
+	@Override
+	public void updateResource(int index, ResourceProfile targetResource) {
+		TaskSlot<T> taskSlot = taskSlots.get(index);
+		taskSlot.updateResource(targetResource);
+	}
+
 	// ---------------------------------------------------------------------
 	// TimeoutListener methods
 	// ---------------------------------------------------------------------

@@ -294,6 +294,21 @@ public class SlotManagerImpl implements SlotManager {
 		return slots.values();
 	}
 
+	@Override
+	public void updateResource(SlotID slotID, ResourceProfile resourceProfile) {
+		TaskManagerSlot slot = slots.get(slotID);
+
+		if (null != slot) {
+			TaskExecutorConnection taskExecutorConnection = slot.getTaskManagerConnection();
+			TaskExecutorGateway gateway = taskExecutorConnection.getTaskExecutorGateway();
+
+			gateway.updateResource(slotID, resourceProfile);
+
+		} else {
+			LOG.debug("Trying to update the resource of the slot {} which has not been registered. Ignoring this message.", slotID);
+		}
+	}
+
 	/**
 	 * Requests a slot with the respective resource profile.
 	 *

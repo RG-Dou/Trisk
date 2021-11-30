@@ -29,6 +29,9 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
+import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -365,6 +368,11 @@ public class TestingJobMasterGateway implements JobMasterGateway {
 
 	@Override
 	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return null;
+	}
+
+	@Override
+	public CompletableFuture<Boolean> updateSlotResource(SlotID slotID, ResourceProfile targetResource) {
 		return null;
 	}
 }

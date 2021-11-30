@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.taskexecutor.slot;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.concurrent.FutureUtils;
@@ -315,5 +316,16 @@ public class TaskSlot<T extends TaskSlotPayload> implements AutoCloseableAsync {
 
 	private static MemoryManager createMemoryManager(ResourceProfile resourceProfile, int pageSize) {
 		return new MemoryManager(resourceProfile.getManagedMemory().getBytes(), pageSize);
+	}
+
+	//Issue: vScaling
+	public void updateResource(ResourceProfile targetResource){
+		MemorySize targetManagedMemory = targetResource.getManagedMemory();
+		MemorySize currentManagedMemory = resourceProfile.getManagedMemory();
+		if (targetManagedMemory.compareTo(currentManagedMemory) < 0){
+			memoryManager.shrink(currentManagedMemory.subtract(targetManagedMemory).getBytes());
+		} else if(targetManagedMemory.compareTo(currentManagedMemory) > 0){
+			memoryManager.expand(targetManagedMemory.subtract(currentManagedMemory).getBytes());
+		}
 	}
 }

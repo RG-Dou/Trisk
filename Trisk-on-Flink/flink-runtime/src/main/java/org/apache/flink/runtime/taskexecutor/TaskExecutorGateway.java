@@ -241,4 +241,6 @@ public interface TaskExecutorGateway extends RpcGateway {
 	 * @return Future flag indicating whether the task executor can be released.
 	 */
 	CompletableFuture<Boolean> canBeReleased();
+
+	void updateResource(SlotID slotID, ResourceProfile targetResource);
 }

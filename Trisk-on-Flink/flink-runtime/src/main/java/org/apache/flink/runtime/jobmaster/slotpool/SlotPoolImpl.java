@@ -817,6 +817,11 @@ public class SlotPoolImpl implements SlotPool {
 		return resourceManagerGateway.getAllSlots();
 	}
 
+	@Override
+	public void updateSlotResource(SlotID slotID, ResourceProfile targetResource) {
+		resourceManagerGateway.updateSlotResource(slotID, targetResource);
+	}
+
 	/**
 	 * Register TaskManager to this pool, only those slots come from registered TaskManager will be considered valid.
 	 * Also it provides a way for us to keep "dead" or "abnormal" TaskManagers out of this pool.

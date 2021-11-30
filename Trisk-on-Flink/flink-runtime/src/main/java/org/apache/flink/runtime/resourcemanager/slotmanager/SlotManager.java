@@ -58,6 +58,8 @@ public interface SlotManager extends AutoCloseable {
 
 	Collection<TaskManagerSlot> getAllSlots();
 
+	void updateResource(SlotID slotID, ResourceProfile resourceProfile);
+
 	/**
 	 * Starts the slot manager with the given leader id and resource manager actions.
 	 *

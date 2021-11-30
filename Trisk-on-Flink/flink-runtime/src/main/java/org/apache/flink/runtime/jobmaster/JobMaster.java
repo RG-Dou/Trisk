@@ -30,6 +30,8 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
@@ -596,6 +598,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	@Override
 	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
 		return slotPool.getAllSlots();
+	}
+
+	@Override
+	public CompletableFuture<Boolean> updateSlotResource(SlotID slotID, ResourceProfile targetResource) {
+		this.slotPool.updateSlotResource(slotID, targetResource);
+		return CompletableFuture.completedFuture(Boolean.TRUE);
 	}
 
 	private void internalFailAllocation(AllocationID allocationId, Exception cause) {

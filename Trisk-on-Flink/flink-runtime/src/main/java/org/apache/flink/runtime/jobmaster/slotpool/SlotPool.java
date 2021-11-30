@@ -195,4 +195,7 @@ public interface SlotPool extends AllocatedSlotActions, AutoCloseable {
 		SlotID slotId);
 
 	CompletableFuture<Collection<TaskManagerSlot>> getAllSlots();
+
+	//Issue: vScaling
+	void updateSlotResource(SlotID slotID, ResourceProfile targetResource);
 }

@@ -272,6 +272,10 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		return CompletableFuture.completedFuture(slotManager.getAllSlots());
 	}
 
+	public void updateSlotResource(SlotID slotID, ResourceProfile targetResource){
+		this.slotManager.updateResource(slotID, targetResource);
+	}
+
 	@Override
 	public CompletableFuture<RegistrationResponse> registerJobManager(
 			final JobMasterId jobMasterId,

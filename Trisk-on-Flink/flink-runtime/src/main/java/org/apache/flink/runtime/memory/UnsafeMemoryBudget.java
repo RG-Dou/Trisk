@@ -42,17 +42,21 @@ class UnsafeMemoryBudget {
 	private static final int MAX_SLEEPS = 10;
 	private static final int RETRIGGER_GC_AFTER_SLEEPS = 9; // ~ 0.5 sec
 
-	private final long totalMemorySize;
+	//Issue: vScaling
+//	private final long totalMemorySize;
+	private final AtomicLong totalMemorySize;
 
 	private final AtomicLong availableMemorySize;
 
 	UnsafeMemoryBudget(long totalMemorySize) {
-		this.totalMemorySize = totalMemorySize;
+		//Issue: vScaling
+//		this.totalMemorySize = totalMemorySize;
+		this.totalMemorySize = new AtomicLong(totalMemorySize);
 		this.availableMemorySize = new AtomicLong(totalMemorySize);
 	}
 
 	long getTotalMemorySize() {
-		return totalMemorySize;
+		return totalMemorySize.get();
 	}
 
 	long getAvailableMemorySize() {
@@ -61,12 +65,12 @@ class UnsafeMemoryBudget {
 
 	boolean verifyEmpty() {
 		try {
-			reserveMemory(totalMemorySize);
+			reserveMemory(totalMemorySize.get());
 		} catch (MemoryReservationException e) {
 			return false;
 		}
-		releaseMemory(totalMemorySize);
-		return availableMemorySize.get() == totalMemorySize;
+		releaseMemory(totalMemorySize.get());
+		return availableMemorySize.get() == totalMemorySize.get();
 	}
 
 	/**
@@ -168,7 +172,7 @@ class UnsafeMemoryBudget {
 		}
 		boolean released = false;
 		long currentAvailableMemorySize = 0L;
-		while (!released && totalMemorySize >= (currentAvailableMemorySize = availableMemorySize.get()) + size) {
+		while (!released && totalMemorySize.get() >= (currentAvailableMemorySize = availableMemorySize.get()) + size) {
 			released = availableMemorySize
 				.compareAndSet(currentAvailableMemorySize, currentAvailableMemorySize + size);
 		}
@@ -177,7 +181,55 @@ class UnsafeMemoryBudget {
 				"Trying to release more managed memory (%d bytes) than has been allocated (%d bytes), the total size is %d bytes",
 				size,
 				currentAvailableMemorySize,
-				totalMemorySize));
+				totalMemorySize.get()));
+		}
+	}
+
+	//issue: vScaling
+	void shrink(long size) {
+		long currentTotalMemorySize = totalMemorySize.get();
+		boolean shrink = true;
+
+		try {
+			reserveMemory(size);
+		} catch (MemoryReservationException e) {
+			throw new IllegalStateException(String.format(
+				"Trying to shrink more managed memory (%d bytes) than now available (%d bytes), the total size is %d bytes",
+				size,
+				availableMemorySize.get(),
+				totalMemorySize.get()));
+		}
+
+		shrink = totalMemorySize
+			.compareAndSet(currentTotalMemorySize, currentTotalMemorySize - size);
+		if(!shrink){
+			throw new IllegalStateException(String.format(
+				"Trying to shrink more managed memory (%d bytes) than has been allocated (%d bytes), the total size is %d bytes",
+				size,
+				availableMemorySize.get(),
+				totalMemorySize.get()));
+		}
+	}
+
+	//issue: vScaling
+	void expand(long size){
+		if(size <= 0){
+			return;
+		}
+		totalMemorySize.addAndGet(size);
+
+		boolean released = false;
+		long currentAvailableMemorySize = 0L;
+		while(!released && totalMemorySize.get() >= (currentAvailableMemorySize = availableMemorySize.get()) + size){
+			released = availableMemorySize
+				.compareAndSet(currentAvailableMemorySize, currentAvailableMemorySize + size);
+		}
+		if (!released) {
+			throw new IllegalStateException(String.format(
+				"Trying to expand more managed memory (%d bytes) than has been allocated (%d bytes), the total size is %d bytes",
+				size,
+				currentAvailableMemorySize,
+				totalMemorySize.get()));
 		}
 	}
 }

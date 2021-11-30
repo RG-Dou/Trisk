@@ -24,6 +24,8 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinatorGateway;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
@@ -295,4 +297,7 @@ public interface JobMasterGateway extends
 	default <M>void callOperations(Function<PrimitiveOperation<M>, CompletableFuture<?>> operationCaller) {}
 
 	CompletableFuture<Collection<TaskManagerSlot>> getAllSlots();
+
+	//Issue: vScaling
+	CompletableFuture<Boolean> updateSlotResource(SlotID slotID, ResourceProfile targetResource);
 }

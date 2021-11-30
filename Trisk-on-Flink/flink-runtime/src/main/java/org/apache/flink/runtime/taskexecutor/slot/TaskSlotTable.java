@@ -24,6 +24,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.memory.MemoryManager;
@@ -265,4 +266,6 @@ public interface TaskSlotTable<T extends TaskSlotPayload> extends TimeoutListene
 	 * @return the memory manager of the slot allocated for the task
 	 */
 	MemoryManager getTaskMemoryManager(AllocationID allocationID) throws SlotNotFoundException;
+
+	void updateResource(int index, ResourceProfile targetResource);
 }

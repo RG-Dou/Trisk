@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.instance.InstanceID;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
@@ -75,6 +76,11 @@ public class TestingSlotManager implements SlotManager {
 	@Override
 	public Collection<TaskManagerSlot> getAllSlots() {
 		return null;
+	}
+
+	@Override
+	public void updateResource(SlotID slotID, ResourceProfile resourceProfile) {
+
 	}
 
 	@Override

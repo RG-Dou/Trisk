@@ -623,6 +623,11 @@ public class JobMasterTest extends TestLogger {
 		}
 
 		@Override
+		public void updateSlotResource(SlotID slotID, ResourceProfile targetResource) {
+
+		}
+
+		@Override
 		public void releaseSlot(@Nonnull SlotRequestId slotRequestId, @Nullable Throwable cause) {
 			throw new UnsupportedOperationException("TestingSlotPool does not support this operation.");
 		}

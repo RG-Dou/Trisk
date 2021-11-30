@@ -308,6 +308,11 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 		return CompletableFuture.completedFuture(shuffleEnvironment.getPartitionsOccupyingLocalResources().isEmpty());
 	}
 
+	@Override
+	public void updateResource(SlotID slotID, ResourceProfile targetResource) {
+		this.taskSlotTable.updateResource(slotID.getSlotNumber(), targetResource);
+	}
+
 	// ------------------------------------------------------------------------
 	//  Life cycle
 	// ------------------------------------------------------------------------

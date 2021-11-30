@@ -20,12 +20,17 @@ package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -56,6 +61,15 @@ public interface ReconfigurationExecutor {
 
 	@Deprecated
 	void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController);
+
+	//Issue: vScaling
+	void updateSlotResource(SlotID slotID, ResourceProfile targetResource, UpdateResourceCallback callback);
+
+	interface UpdateResourceCallback{
+		default void callback(SlotID slotID){}
+	}
+
+	Collection<TaskManagerSlot> getAllSlots();
 
 	@Deprecated
 	void rescale(ExecutionPlan executionPlan, int operatorID, Boolean isScaleIn, ControlPolicy waitingController);

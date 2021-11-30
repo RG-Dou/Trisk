@@ -26,6 +26,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFactory;
@@ -79,6 +80,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
 import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
@@ -204,6 +206,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				break;
 			case "FraudDetectionController":
 				this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
+				break;
+			case "VerticalScalingTest":
+				this.controlPolicyList.put("VerticalScalingTest", new VerticalScalingTest(this));
 				break;
 		}
 
@@ -476,6 +481,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			e.printStackTrace();
 		}
 	}
+
 
 	@Override
 	public void rescale(ExecutionPlan executionPlan, int operatorID, Boolean isScaleIn,  ControlPolicy waitingController) {
@@ -1299,6 +1305,45 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			e.printStackTrace();
 		}
 	}
+
+	//Issue: vScaling
+	@Override
+	public void updateSlotResource(SlotID slotID, ResourceProfile targetResource, UpdateResourceCallback callback){
+		JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+		runAsync(() -> jobMasterGateway.callOperations(
+			coordinator -> {
+				CompletableFuture<Boolean> syncFuture = FutureUtils.completedVoidFuture()
+					.thenCompose(o -> jobMasterGateway.updateSlotResource(slotID, targetResource));
+
+				return syncFuture.whenComplete((o, failure) -> {
+					if (failure != null) {
+						LOG.error("update resources failed: ", failure);
+						failure.printStackTrace();
+					}
+					try {
+						System.out.println("the resource of slot " + slotID + " finished update");
+						log.info("the resource of slot " + slotID + " finished update");
+						callback.callback(slotID);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				});
+			}
+			));
+
+	}
+
+	@Override
+	public Collection<TaskManagerSlot> getAllSlots(){
+		JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+		try {
+			return jobMasterGateway.getAllSlots().get();
+		} catch (InterruptedException | ExecutionException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
 
 	// ------------------------------------------------------------------------
 	//  Error Handling

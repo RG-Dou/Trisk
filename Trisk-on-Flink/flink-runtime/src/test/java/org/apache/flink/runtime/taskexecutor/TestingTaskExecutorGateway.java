@@ -206,6 +206,11 @@ public class TestingTaskExecutorGateway implements TaskExecutorGateway {
 	}
 
 	@Override
+	public void updateResource(SlotID slotID, ResourceProfile targetResource) {
+
+	}
+
+	@Override
 	public String getAddress() {
 		return address;
 	}

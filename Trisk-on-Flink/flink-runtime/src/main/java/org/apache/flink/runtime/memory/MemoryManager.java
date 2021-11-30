@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -75,7 +76,9 @@ public class MemoryManager {
 
 	private final long pageSize;
 
-	private final long totalNumberOfPages;
+	//Issue: vScaling
+//	private final long totalNumberOfPages;
+	private final AtomicLong totalNumberOfPages;
 
 	private final UnsafeMemoryBudget memoryBudget;
 
@@ -95,11 +98,15 @@ public class MemoryManager {
 
 		this.pageSize = pageSize;
 		this.memoryBudget = new UnsafeMemoryBudget(memorySize);
-		this.totalNumberOfPages = memorySize / pageSize;
+		//Issue: vScaling
+//		this.totalNumberOfPages = memorySize / pageSize;
+		this.totalNumberOfPages = new AtomicLong(memorySize / pageSize);
 		this.allocatedSegments = new ConcurrentHashMap<>();
 		this.reservedMemory = new ConcurrentHashMap<>();
 		this.sharedResources = new SharedResources();
-		verifyIntTotalNumberOfPages(memorySize, totalNumberOfPages);
+		//Issue: vScaling
+//		verifyIntTotalNumberOfPages(memorySize, totalNumberOfPages);
+		verifyIntTotalNumberOfPages(memorySize, totalNumberOfPages.get());
 
 		LOG.debug(
 			"Initialized MemoryManager with total memory size {} and page size {}.",
@@ -212,7 +219,8 @@ public class MemoryManager {
 		Preconditions.checkNotNull(owner, "The memory owner must not be null.");
 		Preconditions.checkState(!isShutDown, "Memory manager has been shut down.");
 		Preconditions.checkArgument(
-			numberOfPages <= totalNumberOfPages,
+			//Issue: vScaling
+			numberOfPages <= totalNumberOfPages.get(),
 			"Cannot allocate more segments %d than the max number %d",
 			numberOfPages,
 			totalNumberOfPages);
@@ -609,7 +617,7 @@ public class MemoryManager {
 			throw new IllegalArgumentException("The fraction of memory to allocate must within (0, 1].");
 		}
 
-		return (int) (totalNumberOfPages * fraction);
+		return (int) (totalNumberOfPages.get() * fraction);
 	}
 
 	/**
@@ -632,5 +640,26 @@ public class MemoryManager {
 
 	public static MemoryManager forDefaultPageSize(long size) {
 		return new MemoryManager(size, DEFAULT_PAGE_SIZE);
+	}
+
+	//Issue: vScaling
+	public void shrink(long size){
+		long shrinkPages = size / pageSize;
+		Preconditions.checkArgument(
+			//Issue: vScaling
+			shrinkPages <= totalNumberOfPages.get(),
+			"Cannot shrink more segments %d than the max number %d",
+			shrinkPages,
+			totalNumberOfPages);
+
+		memoryBudget.shrink(size);
+		totalNumberOfPages.addAndGet(-shrinkPages);
+	}
+
+	//Issue: vScaling
+	public void expand(long size){
+		memoryBudget.expand(size);
+		long expandPages = size / pageSize;
+		totalNumberOfPages.addAndGet(expandPages);
 	}
 }

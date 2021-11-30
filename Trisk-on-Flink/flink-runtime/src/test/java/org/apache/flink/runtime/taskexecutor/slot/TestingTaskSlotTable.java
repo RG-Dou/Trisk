@@ -23,6 +23,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -174,6 +175,11 @@ public class TestingTaskSlotTable<T extends TaskSlotPayload> implements TaskSlot
 	@Override
 	public MemoryManager getTaskMemoryManager(AllocationID allocationID) {
 		return memoryManagerGetter.apply(allocationID);
+	}
+
+	@Override
+	public void updateResource(int index, ResourceProfile targetResource) {
+
 	}
 
 	@Override
