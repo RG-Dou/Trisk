@@ -53,7 +53,7 @@ public class InAppStatefulStockExchange {
         // set up the execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        env.setStateBackend(new MemoryStateBackend(100000000));
+//        env.setStateBackend(new MemoryStateBackend(100000000));
 
         // make parameters available in the web interface
         env.getConfig().setGlobalJobParameters(params);
@@ -66,7 +66,7 @@ public class InAppStatefulStockExchange {
 
         final DataStream<Tuple3<String, String, Long>> text = env.addSource(
                 new SSERealRateSourceFunctionKV(
-                        params.get("source-file", "/home/myc/workspace/datasets/SSE/sb-5min.txt")))
+                        params.get("source-file", "/home/drg/projects/data/SSE/SSE_data/sb-opening-50ms.txt")))
                 .uid("sentence-source")
                 .setParallelism(params.getInt("p1", 1))
                 .setMaxParallelism(params.getInt("mp2", 128));
@@ -108,7 +108,7 @@ public class InAppStatefulStockExchange {
         private Map<String, HashMap<Integer, ArrayList<Order>>> poolS = new HashMap<>();
         private Map<String, HashMap<Integer, ArrayList<Order>>> poolB = new HashMap<>();
 
-        private int continuousAuction = 92500;
+        private int continuousAuction = 91500;
         private boolean callAuctionAllowed = true;
 
         private boolean isPoolLoaded = false;
@@ -154,7 +154,7 @@ public class InAppStatefulStockExchange {
                     insertPool(curOrder, orderArr[Sec_Code], orderArr[Trade_Dir]);
                 }
             } else {
-                delay(8);
+//                delay(8);
                 Map<String, String> matchedResult = continuousStockExchange(orderArr, orderArr[Trade_Dir]);
             }
 
