@@ -92,10 +92,10 @@ public class SSERealRateSourceFunctionKV extends RichParallelSourceFunction<Tupl
 
                 Long ts = System.currentTimeMillis();
                 List<String> stockArr = Arrays.asList(sCurrentLine.split("\\|"));
-                int stopTime = 92500;
-                int curTime = Integer.parseInt(sCurrentLine.split("\\|")[Last_Upd_Time].replace(":", ""));
-                if (curTime > stopTime)
-                    break;
+//                int stopTime = 92500;
+//                int curTime = Integer.parseInt(sCurrentLine.split("\\|")[Last_Upd_Time].replace(":", ""));
+//                if (curTime > stopTime)
+//                    break;
 
                 ctx.collect(new Tuple3<>(stockArr.get(Sec_Code), sCurrentLine, ts));
                 counter++;

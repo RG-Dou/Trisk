@@ -175,9 +175,11 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 			if (deserializationDuration > 0) {
 //				metricsManager.addDeserialization(deserializationDuration);
-				metricsManager.inputBufferConsumed(System.nanoTime(),
-					deserializationDuration, processingDuration,
-					recordsProcessed, endToEndLatency);
+				if(metricsManager != null) {
+					metricsManager.inputBufferConsumed(System.nanoTime(),
+						deserializationDuration, processingDuration,
+						recordsProcessed, endToEndLatency);
+				}
 
 				processingDuration = 0;
 				recordsProcessed = 0;
@@ -190,7 +192,9 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 	private void processElement(StreamElement recordOrMark, DataOutput<T> output) throws Exception {
 		if (recordOrMark.isRecord()){
 			StreamRecord<T> record = recordOrMark.asRecord();
-			metricsManager.incRecordIn(record.getKeyGroup());
+			if(metricsManager != null) {
+				metricsManager.incRecordIn(record.getKeyGroup());
+			}
 			long queuingDelay = System.currentTimeMillis() - record.getLatencyTimestamp();
 			long processingStart = System.nanoTime();
 			output.emitRecord(record);
@@ -199,7 +203,9 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 			processingDuration += processingDelay;
 			long latency = queuingDelay + processingDelay/1000000;
 			endToEndLatency += latency;
-			metricsManager.groundTruth(record.getLatencyTimestamp(), latency);
+			if(metricsManager != null){
+				metricsManager.groundTruth(record.getLatencyTimestamp(), latency);
+			}
 		} else if (recordOrMark.isWatermark()) {
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel);
 		} else if (recordOrMark.isLatencyMarker()) {
@@ -222,7 +228,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 			currentRecordDeserializer.setNextBuffer(bufferOrEvent.getBuffer());
 
 			// inform the MetricsManager that we got a new input buffer
-			metricsManager.newInputBuffer(System.nanoTime());
+			if(metricsManager != null)
+				metricsManager.newInputBuffer(System.nanoTime());
 		}
 		else {
 			// Event received
