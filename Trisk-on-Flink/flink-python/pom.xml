@@ -34,6 +34,11 @@ under the License.
 
 	<packaging>jar</packaging>
 
+<!--	works for MAC OS M1-->
+	<properties>
+		<os.detected.classifier>osx-x86_64</os.detected.classifier>
+	</properties>
+
 	<dependencies>
 
 		<!-- core dependencies -->
@@ -347,6 +352,8 @@ under the License.
 							<inputDirectories>
 								<include>pyflink/proto</include>
 							</inputDirectories>
+<!--							works for MAC OS M1-->
+							<protocArtifact>com.google.protobuf:protoc:3.7.1:exe:${os.detected.classifier}</protocArtifact>
 						</configuration>
 					</execution>
 				</executions>

@@ -239,7 +239,9 @@ under the License.
 			<plugin>
 				<groupId>com.github.eirslett</groupId>
 				<artifactId>frontend-maven-plugin</artifactId>
-				<version>1.6</version>
+<!--				<version>1.6</version>-->
+<!--				works for MAC OS M1-->
+				<version>1.11.0</version>
 				<executions>
 					<execution>
 						<id>install node and npm</id>
@@ -257,6 +259,7 @@ under the License.
 						</goals>
 						<configuration>
 							<arguments>ci --cache-max=0 --no-save</arguments>
+<!--							<arguments>install -g -registry=https://registry.npm.taobao.org &#45;&#45;cache-max=0 &#45;&#45;no-save</arguments>-->
 							<environmentVariables>
 								<HUSKY_SKIP_INSTALL>true</HUSKY_SKIP_INSTALL>
 							</environmentVariables>
