@@ -22,6 +22,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.io.PushingAsyncDataInput.DataOutput;
@@ -323,6 +324,11 @@ public final class StreamTwoInputProcessor<IN1, IN2> implements StreamInputProce
 
 	private int getInputId(int inputIndex) {
 		return inputIndex + 1;
+	}
+
+	public void setMetricsManager(MetricsManager metricsManager){
+		((StreamTaskNetworkInput) this.input1).setMetricsManager(metricsManager);
+		((StreamTaskNetworkInput) this.input2).setMetricsManager(metricsManager);
 	}
 
 	/**
