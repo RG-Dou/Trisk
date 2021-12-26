@@ -42,6 +42,7 @@ import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class Query3Stateful {
@@ -158,7 +159,11 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
     @Override
     public void flatMap2(Person person, Collector<Tuple4<String, String, String, Long>> out) throws Exception {
         // store person in state
+        Tuple3<String, String, String> value = new Tuple3<>(person.name, person.city, person.state);
         personMap.put(person.id, new Tuple3<>(person.name, person.city, person.state));
+        System.out.println("The size we receive: " + person.sizeInBytes());
+        System.out.println("The size to store: " + value.toString().getBytes().length);
+        System.out.println("The key is: " + person.id);
 
         // check if person has a match in the auction state
         if (auctionMap.containsKey(person.id)) {

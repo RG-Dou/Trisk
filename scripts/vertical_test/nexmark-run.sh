@@ -27,11 +27,11 @@ init() {
 #  partitions=128
 #  parallelism=1
   AUCTION_S=20000
-  PERSON_S=10000
+  PERSON_S=10000000
   AUCTION_P=1
   PERSON_P=1
   JOIN_P=1
-  runtime=300
+  runtime=600
   blockCacheSize=$1
   ROCKSDB_LOG_DIR="/home/drg/projects/work3/flink/rocksdb-storage/logdir/"
   DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}"

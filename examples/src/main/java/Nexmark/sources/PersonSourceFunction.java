@@ -34,22 +34,26 @@ import java.util.Random;
 public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
 
     private volatile boolean running = true;
-    private final GeneratorConfig config = new GeneratorConfig(NexmarkConfiguration.DEFAULT, 1, 1000L, 0, 1);
+//    private final GeneratorConfig config = new GeneratorConfig(NexmarkConfiguration.DEFAULT, 1, 1000L, 0, 1);
+    private final GeneratorConfig config;
     private long eventsCountSoFar = 0;
     private int rate;
     private int cycle = 60;
     private int base = 0;
     private int warmUpInterval = 100000;
+    private int densityId = 25;
 
     public PersonSourceFunction(int srcRate, int cycle) {
-        this.rate = srcRate;
-        this.cycle = cycle;
+//        this.rate = srcRate;
+//        this.cycle = cycle;
+        this(srcRate, cycle, 0);
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base) {
-        this.rate = srcRate;
-        this.cycle = cycle;
-        this.base = base;
+        this(srcRate, cycle, base, 100000);
+//        this.rate = srcRate;
+//        this.cycle = cycle;
+//        this.base = base;
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {
@@ -57,10 +61,14 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
         this.cycle = cycle;
         this.base = base;
         this.warmUpInterval = warmUpInterval;
+        NexmarkConfiguration nexConfig = NexmarkConfiguration.DEFAULT;
+        nexConfig.avgPersonByteSize = 0;
+        config = new GeneratorConfig(nexConfig, 1, 1000L, 0, 1);
     }
 
     public PersonSourceFunction(int srcRate) {
-        this.rate = srcRate;
+        this(srcRate, 60);
+//        this.rate = srcRate;
     }
 
     @Override
@@ -72,7 +80,7 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
         int curRate = rate;
 
         // warm up
-        Thread.sleep(60000);
+        Thread.sleep(30000);
         warmup(ctx);
 
         while (running) {
@@ -134,6 +142,7 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
     }
 
     private long nextId() {
-        return config.firstEventId + config.nextAdjustedEventNumber(eventsCountSoFar);
+//        return config.firstEventId + config.nextAdjustedEventNumber(eventsCountSoFar);
+        return (config.firstEventId + config.nextAdjustedEventNumber(eventsCountSoFar)) * densityId;
     }
 }
