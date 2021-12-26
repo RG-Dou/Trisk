@@ -161,9 +161,6 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
         // store person in state
         Tuple3<String, String, String> value = new Tuple3<>(person.name, person.city, person.state);
         personMap.put(person.id, new Tuple3<>(person.name, person.city, person.state));
-        System.out.println("The size we receive: " + person.sizeInBytes());
-        System.out.println("The size to store: " + value.toString().getBytes().length);
-        System.out.println("The key is: " + person.id);
 
         // check if person has a match in the auction state
         if (auctionMap.containsKey(person.id)) {
