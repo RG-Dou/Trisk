@@ -209,7 +209,11 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 
 //				long processingStart = System.nanoTime();
 //				long processingStart = System.currentTimeMillis();
+
+				long processingStart = System.nanoTime();
 				operator.processElement(record);
+				record.setProcessTime(System.nanoTime() - processingStart);
+
 //				long processingDelay = System.currentTimeMillis() - processingStart;
 
 //				metricsManager.groundTruth(record.getKeyGroup(), processingDelay + queuingDelay);

@@ -39,6 +39,9 @@ public final class StreamRecord<T> extends StreamElement {
 	// add a new timestamp to get end-to-end latency
 	private long latencyTimestamp;
 
+	// The process time of this tuple;
+	private long processTime;
+
 	// add a new timestamp to get end-to-end latency
 	private int keyGroup;
 	/**
@@ -61,6 +64,7 @@ public final class StreamRecord<T> extends StreamElement {
 		this.latencyTimestamp = 0l;
 		this.keyGroup=0;
 		this.hasTimestamp = true;
+		this.processTime = 0;
 	}
 
 	// ------------------------------------------------------------------------
@@ -216,4 +220,8 @@ public final class StreamRecord<T> extends StreamElement {
 	public int getKeyGroup() {
 		return this.keyGroup;
 	}
+
+	public void setProcessTime(long processTime){ this.processTime = processTime;}
+
+	public long getProcessTime() {return processTime;}
 }

@@ -101,9 +101,24 @@ public final class ChannelSelectorRecordWriter<T extends IOReadableWritable> ext
 	public BufferBuilder requestNewBufferBuilder(int targetChannel) throws IOException, InterruptedException {
 		checkState(bufferBuilders[targetChannel] == null || bufferBuilders[targetChannel].isFinished());
 
+		long bufferStart = System.nanoTime();
+
 		BufferBuilder bufferBuilder = targetPartition.getBufferBuilder();
+
+		long bufferEnd = System.nanoTime();
+		if (bufferEnd - bufferStart > 0) {
+			// add waiting duration to the MetricsManager
+			metricsManager.addWaitingForWriteBufferDuration(bufferEnd - bufferStart);
+		}
+		long start = System.nanoTime();
+
 		targetPartition.addBufferConsumer(bufferBuilder.createBufferConsumer(), targetChannel);
 		bufferBuilders[targetChannel] = bufferBuilder;
+
+		long end = System.nanoTime();
+		// add serialization duration to the MetricsManager
+		metricsManager.addSerialization(end - start);
+
 		return bufferBuilder;
 	}
 

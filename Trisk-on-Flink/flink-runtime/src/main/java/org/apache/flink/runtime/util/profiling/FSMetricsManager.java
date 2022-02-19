@@ -251,7 +251,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //						+ " totalRecordsOut: " + totalRecordsOut;
 
 					//Issus: vScaling
-//					outputStreamDecorator.println(ratesLine);
+					outputStreamDecorator.println(ratesLine);
 //					System.out.println("workername: " + getJobVertexId() + " epoch: " + epoch + " keygroups: " + status.inputKeyGroup.keySet());
 
 
@@ -298,7 +298,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 	@Override
 	public void groundTruth(long arrivalTs, long latency) {
 		//Issue: vScaling
-//		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, latency));
+		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, latency));
 //		System.out.printf("ts: %d endToEnd latency: %d%n", arrivalTs, latency);
 	}
 

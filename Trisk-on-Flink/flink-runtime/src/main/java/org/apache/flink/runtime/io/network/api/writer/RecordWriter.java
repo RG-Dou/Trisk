@@ -154,16 +154,16 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 				break;
 			}
 
-			long bufferStart = System.nanoTime();
+//			long bufferStart = System.nanoTime();
 
 			bufferBuilder = requestNewBufferBuilder(targetChannel);
 
-			long bufferEnd = System.nanoTime();
+//			long bufferEnd = System.nanoTime();
 
-			if (bufferEnd - bufferStart > 0) {
-				// add waiting duration to the MetricsManager
-				metricsManager.addWaitingForWriteBufferDuration(bufferEnd - bufferStart);
-			}
+//			if (bufferEnd - bufferStart > 0) {
+//				// add waiting duration to the MetricsManager
+//				metricsManager.addWaitingForWriteBufferDuration(bufferEnd - bufferStart);
+//			}
 
 			result = serializer.copyToBufferBuilder(bufferBuilder);
 
@@ -198,6 +198,14 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 //		metricsManager.outputBufferFull(System.nanoTime());
 
 		targetPartition.flushAll();
+
+		try {
+			metricsManager.outputBufferFull(System.nanoTime());
+		} catch (Exception e) {
+			long start = System.nanoTime();
+			while (System.nanoTime() - start < 1000000000) {}
+			metricsManager.outputBufferFull(System.nanoTime());
+		}
 	}
 
 	protected void flushTargetPartition(int targetChannel) {

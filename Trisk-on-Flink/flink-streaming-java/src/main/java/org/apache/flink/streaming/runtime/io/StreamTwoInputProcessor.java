@@ -133,7 +133,11 @@ public final class StreamTwoInputProcessor<IN1, IN2> implements StreamInputProce
 			Counter numRecordsIn) throws Exception {
 
 		streamOperator.setKeyContextElement1(record);
+
+		long processingStart = System.nanoTime();
 		streamOperator.processElement1(record);
+		record.setProcessTime(System.nanoTime() - processingStart);
+
 		postProcessRecord(numRecordsIn);
 	}
 
@@ -143,7 +147,11 @@ public final class StreamTwoInputProcessor<IN1, IN2> implements StreamInputProce
 			Counter numRecordsIn) throws Exception {
 
 		streamOperator.setKeyContextElement2(record);
+
+		long processingStart = System.nanoTime();
 		streamOperator.processElement2(record);
+		record.setProcessTime(System.nanoTime() - processingStart);
+
 		postProcessRecord(numRecordsIn);
 	}
 

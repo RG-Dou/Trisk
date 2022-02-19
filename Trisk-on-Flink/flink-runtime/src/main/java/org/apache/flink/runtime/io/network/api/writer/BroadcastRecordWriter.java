@@ -130,7 +130,17 @@ public final class BroadcastRecordWriter<T extends IOReadableWritable> extends R
 	public BufferBuilder requestNewBufferBuilder(int targetChannel) throws IOException, InterruptedException {
 		checkState(bufferBuilder == null || bufferBuilder.isFinished());
 
+		long bufferStart = System.nanoTime();
+
 		BufferBuilder builder = targetPartition.getBufferBuilder();
+
+		long bufferEnd = System.nanoTime();
+		if (bufferEnd - bufferStart > 0) {
+			// add waiting duration to the MetricsManager
+			metricsManager.addWaitingForWriteBufferDuration(bufferEnd - bufferStart);
+		}
+		long start = System.nanoTime();
+
 		if (randomTriggered) {
 			targetPartition.addBufferConsumer(randomTriggeredConsumer = builder.createBufferConsumer(), targetChannel);
 		} else {
@@ -142,6 +152,11 @@ public final class BroadcastRecordWriter<T extends IOReadableWritable> extends R
 		}
 
 		bufferBuilder = builder;
+
+		long end = System.nanoTime();
+		// add serialization duration to the MetricsManager
+		metricsManager.addSerialization(end - start);
+
 		return builder;
 	}
 
