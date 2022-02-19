@@ -23,10 +23,13 @@ import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.PersonSourceFunction;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Person;
+import org.apache.commons.math3.random.RandomDataGenerator;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeinfo.TypeHint;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
@@ -118,7 +121,9 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
     private MapState<Long, Tuple3<String, String, String>> personMap;
 
     // auction state: seller, List<id>
-    private HashMap<Long, HashSet<Long>> auctionMap = new HashMap<>();
+//    private HashMap<Long, HashSet<Long>> auctionMap = new HashMap<>();
+//    private MapState<Long, HashSet<Long>> auctionMap;
+    private RandomDataGenerator randomGen = new RandomDataGenerator();
 
     @Override
     public void open(Configuration parameters) throws Exception {
@@ -128,8 +133,15 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
                         BasicTypeInfo.LONG_TYPE_INFO,
                         new TupleTypeInfo<>(BasicTypeInfo.STRING_TYPE_INFO, BasicTypeInfo.STRING_TYPE_INFO, BasicTypeInfo.STRING_TYPE_INFO)
                        );
+        MapStateDescriptor<Long, HashSet<Long>> auctionDescriptor =
+                new MapStateDescriptor<Long, HashSet<Long>>(
+                        "auction-map",
+                        TypeInformation.of(new TypeHint<Long>() {}),
+                        TypeInformation.of(new TypeHint<HashSet<Long>>() {})
+                );
 
         personMap = getRuntimeContext().getMapState(personDescriptor);
+//        auctionMap = getRuntimeContext().getMapState(auctionDescriptor);
     }
 
     @Override
@@ -140,36 +152,40 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
             Tuple3<String, String, String> match = personMap.get(auction.seller);
             out.collect(new Tuple4<>(match.f0, match.f1, match.f2, auction.id));
         }
-        else {
-            // we need to store this auction for future matches
-            if (auctionMap.containsKey(auction.seller)) {
-                HashSet<Long> ids = auctionMap.get(auction.seller);
-                ids.add(auction.id);
-                auctionMap.put(auction.seller, ids);
-            }
-            else {
-                HashSet<Long> ids = new HashSet<>();
-                ids.add(auction.id);
-                auctionMap.put(auction.seller, ids);
-            }
-        }
-        metricsDump();
+//        else {
+//            // we need to store this auction for future matches
+//            if (auctionMap.containsKey(auction.seller)) {
+//                HashSet<Long> ids = auctionMap.get(auction.seller);
+//                ids.add(auction.id);
+//                auctionMap.put(auction.seller, ids);
+//            }
+//            else {
+//                HashSet<Long> ids = new HashSet<>();
+//                ids.add(auction.id);
+//                auctionMap.put(auction.seller, ids);
+//            }
+//        }
+//        metricsDump();
+//        delay 0.1ms
+        delay(100_000);
     }
 
     @Override
     public void flatMap2(Person person, Collector<Tuple4<String, String, String, Long>> out) throws Exception {
         // store person in state
         Tuple3<String, String, String> value = new Tuple3<>(person.name, person.city, person.state);
-        personMap.put(person.id, new Tuple3<>(person.name, person.city, person.state));
+        personMap.put(person.id, new Tuple3<>(person.name, person.city, person.extra));
 
-        // check if person has a match in the auction state
-        if (auctionMap.containsKey(person.id)) {
-            // output all matches and remove
-            HashSet<Long> auctionIds = auctionMap.remove(person.id);
-            for (Long auctionId : auctionIds) {
-                out.collect(new Tuple4<>(person.name, person.city, person.state, auctionId));
-            }
-        }
+//        // check if person has a match in the auction state
+//        if (auctionMap.containsKey(person.id)) {
+//            // output all matches and remove
+//            HashSet<Long> auctionIds = auctionMap.remove(person.id);
+//            for (Long auctionId : auctionIds) {
+//                out.collect(new Tuple4<>(person.name, person.city, person.state, auctionId));
+//            }
+//        }
+        //delay 0.1ms
+        delay(100_000);
     }
 
     public void metricsDump() throws Exception {
@@ -181,6 +197,10 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
         }
 
         System.out.println("test size: " + sumTest);
+    }
+    private void delay(int interval) {
+        long start = System.nanoTime();
+        while (System.nanoTime() - start < interval) {}
     }
 }
 

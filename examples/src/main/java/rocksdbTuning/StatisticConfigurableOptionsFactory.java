@@ -33,8 +33,10 @@ public class StatisticConfigurableOptionsFactory extends DefaultConfigurableOpti
         statistics.setStatsLevel(StatsLevel.ALL);
         currentOptions.setStatistics(statistics);
         currentOptions.setInfoLogLevel(InfoLogLevel.INFO_LEVEL);
-        currentOptions.setStatsDumpPeriodSec(60);
+        currentOptions.setStatsDumpPeriodSec(30);
         currentOptions.setDbLogDir(dbLogDir);
+        DumpStat dumpStat = new DumpStat(statistics);
+        dumpStat.start();
 
         return currentOptions;
     }
@@ -61,4 +63,34 @@ public class StatisticConfigurableOptionsFactory extends DefaultConfigurableOpti
 
         return optionsFactory;
     }
+
+    class DumpStat implements Runnable {
+        private Thread t;
+        private Statistics statistics;
+
+        DumpStat(Statistics statistics) {
+            this.statistics = statistics;
+        }
+
+        public void run() {
+            try {
+                while(true) {
+                    Thread.sleep(20000);
+                    System.out.println(System.currentTimeMillis() + "/n" + statistics.toString());
+                }
+            }catch (InterruptedException e) {
+                System.out.println("Thread interrupted.");
+            }
+            System.out.println("Thread exiting.");
+        }
+
+        public void start() {
+            System.out.println("Starting DumpStat");
+            if (t == null) {
+                t = new Thread (this, "DumpStat");
+                t.start ();
+            }
+        }
+    }
+
 }

@@ -18,8 +18,10 @@
 
 package Nexmark.sources;
 
+import Nexmark.sources.generator.model.AuctionGeneratorZipf;
 import org.apache.beam.sdk.nexmark.NexmarkConfiguration;
 import org.apache.beam.sdk.nexmark.model.Auction;
+import org.apache.beam.sdk.nexmark.model.Person;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
 import org.apache.beam.sdk.nexmark.sources.generator.model.AuctionGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
@@ -32,22 +34,22 @@ import java.util.Random;
 public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     private volatile boolean running = true;
-    private final GeneratorConfig config = new GeneratorConfig(NexmarkConfiguration.DEFAULT, 1, 1000L, 0, 1);
+//    private final GeneratorConfig config = new GeneratorConfig(NexmarkConfiguration.DEFAULT, 1, 1000L, 0, 1);
+    private final GeneratorConfig config;
     private long eventsCountSoFar = 0;
     private int rate;
     private int cycle = 60;
     private int base = 0;
-    private int warmUpInterval = 100000;
+    private int warmUpInterval = 60000;
+    private int densityId = 25;
+    private final AuctionGeneratorZipf generatorZipf = new AuctionGeneratorZipf(10000, 0.6);
 
     public AuctionSourceFunction(int srcRate, int cycle) {
-        this.rate = srcRate;
-        this.cycle = cycle;
+        this(srcRate, cycle, 0);
     }
 
     public AuctionSourceFunction(int srcRate, int cycle, int base) {
-        this.rate = srcRate;
-        this.cycle = cycle;
-        this.base = base;
+        this(srcRate, cycle, base, 20000);
     }
 
     public AuctionSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {
@@ -55,10 +57,13 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         this.cycle = cycle;
         this.base = base;
         this.warmUpInterval = warmUpInterval;
+        NexmarkConfiguration nexConfig = NexmarkConfiguration.DEFAULT;
+        nexConfig.avgAuctionByteSize = 0;
+        config = new GeneratorConfig(nexConfig, 1, 1000L, 0, 1);
     }
 
     public AuctionSourceFunction(int srcRate) {
-        this.rate = srcRate;
+        this(srcRate, 60);
     }
 
     @Override
@@ -70,7 +75,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         int curRate = rate;
 
         // warm up
-        Thread.sleep(60000);
+        Thread.sleep(30000);
         warmup(ctx);
 
         while (running) {
@@ -84,18 +89,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
                 count = 0;
             }
 
-            for (int i = 0; i < curRate / 20; i++) {
-                long nextId = nextId();
-                Random rnd = new Random(nextId);
-
-                // When, in event time, we should generate the event. Monotonic.
-                long eventTimestamp =
-                        config.timestampAndInterEventDelayUsForEvent(
-                                config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                ctx.collect(AuctionGenerator.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config));
-                eventsCountSoFar++;
-            }
+            sendMessages(ctx, curRate);
 
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
@@ -108,21 +102,28 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         long startTs = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTs < warmUpInterval) {
             long emitStartTime = System.currentTimeMillis();
-            for (int i = 0; i < curRate / 20; i++) {
-                long nextId = nextId();
-                Random rnd = new Random(nextId);
 
-                // When, in event time, we should generate the event. Monotonic.
-                long eventTimestamp =
-                        config.timestampAndInterEventDelayUsForEvent(
-                                config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                ctx.collect(AuctionGenerator.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config));
-                eventsCountSoFar++;
-            }
-
+            sendMessages(ctx, curRate);
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
+        }
+    }
+
+    private void sendMessages(SourceContext<Auction> ctx, int curRate){
+
+        for (int i = 0; i < curRate / 20; i++) {
+            long nextId = nextId();
+            Random rnd = new Random(nextId);
+
+            // When, in event time, we should generate the event. Monotonic.
+            long eventTimestamp =
+                    config.timestampAndInterEventDelayUsForEvent(
+                            config.nextEventNumber(eventsCountSoFar)).getKey();
+
+//                ctx.collect(AuctionGenerator.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config));
+            Auction auction = generatorZipf.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config);
+            ctx.collect(auction);
+            eventsCountSoFar++;
         }
     }
 
@@ -132,6 +133,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
     }
 
     private long nextId() {
-        return config.firstEventId + config.nextAdjustedEventNumber(eventsCountSoFar);
+//        return config.firstEventId + config.nextAdjustedEventNumber(eventsCountSoFar);
+        return (config.firstEventId + config.nextAdjustedEventNumber(eventsCountSoFar)) * densityId;
     }
 }

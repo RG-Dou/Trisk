@@ -18,11 +18,13 @@
 
 package Nexmark.sources;
 
+import Nexmark.sources.generator.model.PersonGeneratorZipf;
 import org.apache.beam.sdk.nexmark.NexmarkConfiguration;
 import org.apache.beam.sdk.nexmark.model.Person;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
 import org.apache.beam.sdk.nexmark.sources.generator.model.PersonGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.joda.time.DateTime;
 
 import java.util.Random;
 
@@ -40,20 +42,16 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
     private int rate;
     private int cycle = 60;
     private int base = 0;
-    private int warmUpInterval = 100000;
+    private int warmUpInterval = 60000;
     private int densityId = 25;
+    private final PersonGeneratorZipf generatorZipf = new PersonGeneratorZipf(10000, 0.6);
 
     public PersonSourceFunction(int srcRate, int cycle) {
-//        this.rate = srcRate;
-//        this.cycle = cycle;
         this(srcRate, cycle, 0);
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base) {
-        this(srcRate, cycle, base, 100000);
-//        this.rate = srcRate;
-//        this.cycle = cycle;
-//        this.base = base;
+        this(srcRate, cycle, base, 20000);
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {
@@ -62,7 +60,7 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
         this.base = base;
         this.warmUpInterval = warmUpInterval;
         NexmarkConfiguration nexConfig = NexmarkConfiguration.DEFAULT;
-        nexConfig.avgPersonByteSize = 0;
+        nexConfig.avgPersonByteSize = 100000;
         config = new GeneratorConfig(nexConfig, 1, 1000L, 0, 1);
     }
 
@@ -94,19 +92,7 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
                 count = 0;
             }
 
-            for (int i = 0; i < Integer.valueOf(curRate/20); i++) {
-                long nextId = nextId();
-                Random rnd = new Random(nextId);
-
-                // When, in event time, we should generate the event. Monotonic.
-                long eventTimestamp =
-                        config.timestampAndInterEventDelayUsForEvent(
-                                config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                ctx.collect(PersonGenerator.nextPerson(nextId, rnd, eventTimestamp, config));
-                eventsCountSoFar++;
-            }
-
+            sendMessages(ctx, curRate);
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
             count++;
@@ -118,21 +104,26 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
         long startTs = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTs < warmUpInterval) {
             long emitStartTime = System.currentTimeMillis();
-            for (int i = 0; i < Integer.valueOf(curRate/20); i++) {
-                long nextId = nextId();
-                Random rnd = new Random(nextId);
-
-                // When, in event time, we should generate the event. Monotonic.
-                long eventTimestamp =
-                        config.timestampAndInterEventDelayUsForEvent(
-                                config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                ctx.collect(PersonGenerator.nextPerson(nextId, rnd, eventTimestamp, config));
-                eventsCountSoFar++;
-            }
-
+            sendMessages(ctx, curRate);
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
+        }
+    }
+
+
+    private void sendMessages(SourceContext<Person> ctx, int curRate){
+        for (int i = 0; i < Integer.valueOf(curRate/20); i++) {
+            long nextId = nextId();
+            Random rnd = new Random(nextId);
+
+            // When, in event time, we should generate the event. Monotonic.
+//            long eventTimestamp =
+//                    config.timestampAndInterEventDelayUsForEvent(
+//                            config.nextEventNumber(eventsCountSoFar)).getKey();
+
+//            ctx.collect(PersonGenerator.nextPerson(nextId, rnd, eventTimestamp, config));
+            ctx.collect(generatorZipf.nextPerson(nextId, rnd, DateTime.now(), config));
+            eventsCountSoFar++;
         }
     }
 
