@@ -26,6 +26,7 @@ import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.Cache;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.IndexType;
 import org.rocksdb.TableFormatConfig;
 
 import javax.annotation.Nullable;
@@ -127,6 +128,11 @@ public final class RocksDBResourceContainer implements AutoCloseable {
 				Preconditions.checkArgument(tableFormatConfig instanceof BlockBasedTableConfig,
 					"We currently only support BlockBasedTableConfig When bounding total memory.");
 				blockBasedTableConfig = (BlockBasedTableConfig) tableFormatConfig;
+			}
+			if (true) {
+				blockBasedTableConfig.setIndexType(IndexType.kTwoLevelIndexSearch);
+				blockBasedTableConfig.setPartitionFilters(true);
+				blockBasedTableConfig.setPinTopLevelIndexAndFilter(true);
 			}
 			blockBasedTableConfig.setBlockCache(blockCache);
 			blockBasedTableConfig.setCacheIndexAndFilterBlocks(true);
