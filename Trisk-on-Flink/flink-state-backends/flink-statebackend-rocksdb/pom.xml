@@ -54,12 +54,16 @@ under the License.
 			<scope>provided</scope>
 		</dependency>
 
+<!--		<dependency>-->
+<!--			<groupId>com.data-artisans</groupId>-->
+<!--			<artifactId>frocksdbjni</artifactId>-->
+<!--			<version>5.17.2-artisans-2.0</version>-->
+<!--		</dependency>-->
 		<dependency>
-			<groupId>com.data-artisans</groupId>
+			<groupId>com.ververica</groupId>
 			<artifactId>frocksdbjni</artifactId>
-			<version>5.17.2-artisans-2.0</version>
+			<version>6.20.3-ververica-1.0</version>
 		</dependency>
-
 		<!-- test dependencies -->
 
 		<dependency>

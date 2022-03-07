@@ -139,6 +139,7 @@ public final class RocksDBResourceContainer implements AutoCloseable {
 			blockBasedTableConfig.setCacheIndexAndFilterBlocksWithHighPriority(true);
 			blockBasedTableConfig.setPinL0FilterAndIndexBlocksInCache(true);
 			opt.setTableFormatConfig(blockBasedTableConfig);
+			sharedResources.getResourceHandle().resizeCache(300*1024*1024);
 		}
 
 		return opt;

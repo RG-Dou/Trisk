@@ -18,7 +18,9 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.rocksdb.Cache;
+import org.rocksdb.MemoryUtil;
 import org.rocksdb.WriteBufferManager;
 
 /**
@@ -48,5 +50,9 @@ final class RocksDBSharedResources implements AutoCloseable {
 	public void close() {
 		writeBufferManager.close();
 		cache.close();
+	}
+
+	public void resizeCache(long target){
+		MemoryUtil.cacheResize(cache, target);
 	}
 }
