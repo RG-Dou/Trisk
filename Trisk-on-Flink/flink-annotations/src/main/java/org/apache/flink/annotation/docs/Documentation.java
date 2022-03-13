@@ -81,6 +81,9 @@ public final class Documentation {
 
 		public static final String STATE_BACKEND_ROCKSDB = "state_backend_rocksdb";
 
+		public static final String STATE_BACKEND_LATENCY_TRACKING =
+			"state_backend_latency_tracking";
+
 		public static final String EXPERT_CLASS_LOADING = "expert_class_loading";
 		public static final String EXPERT_SCHEDULING = "expert_scheduling";
 		public static final String EXPERT_FAULT_TOLERANCE = "expert_fault_tolerance";

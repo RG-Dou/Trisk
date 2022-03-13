@@ -1,21 +1,28 @@
 package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
+import org.apache.flink.streaming.controlplane.rescale.metrics.RestfulMetricsRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.InvocationTargetException;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,9 +31,15 @@ public class VerticalScalingTest extends AbstractController {
 
 	private final Object object = new Object();
 	private final TestingThread testingThread;
+	private final RestfulMetricsRetriever mRetriever;
+	private String REST_SERVER_IP = "trisk.config.rest_server_ip";
+	private String REST_SERVER_PORT = "rest.port";
+	private String JOB_NAME = "trisk.config.job_name";
 
-	public VerticalScalingTest(ReconfigurationExecutor reconfigurationExecutor) {
+	public VerticalScalingTest(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor);
+		String jobName = configuration.getString(JOB_NAME, "Nexmark Query3 stateful");
+		mRetriever = new RestfulMetricsRetriever(configuration.getString(REST_SERVER_IP, "localhost"), configuration.getInteger(REST_SERVER_PORT, 8081), jobName);
 		testingThread = new TestingThread();
 	}
 
@@ -98,9 +111,10 @@ public class VerticalScalingTest extends AbstractController {
 			int statefulOpID = findOperatorByName("Splitter FlatMap");
 
 			try {
-				showOperatorInfo();
+//				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
-				Thread.sleep(50000);
+				Thread.sleep(5000);
+				mRetriever.init();
 				//vScalingTest();
 
 			} catch (InterruptedException e) {

@@ -45,6 +45,7 @@ import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSetFactory;
 import org.apache.flink.runtime.state.heap.InternalKeyContext;
 import org.apache.flink.runtime.state.heap.InternalKeyContextImpl;
+import org.apache.flink.runtime.state.metrics.LatencyTrackingStateConfig;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.IOUtils;
@@ -131,6 +132,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 		LocalRecoveryConfig localRecoveryConfig,
 		RocksDBStateBackend.PriorityQueueStateType priorityQueueStateType,
 		TtlTimeProvider ttlTimeProvider,
+		LatencyTrackingStateConfig latencyTrackingStateConfig,
 		MetricGroup metricGroup,
 		@Nonnull Collection<KeyedStateHandle> stateHandles,
 		StreamCompressionDecorator keyGroupCompressionDecorator,
@@ -144,6 +146,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 			keyGroupRange,
 			executionConfig,
 			ttlTimeProvider,
+			latencyTrackingStateConfig,
 			stateHandles,
 			keyGroupCompressionDecorator,
 			cancelStreamRegistry);
@@ -177,6 +180,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 		LocalRecoveryConfig localRecoveryConfig,
 		RocksDBStateBackend.PriorityQueueStateType priorityQueueStateType,
 		TtlTimeProvider ttlTimeProvider,
+		LatencyTrackingStateConfig latencyTrackingStateConfig,
 		MetricGroup metricGroup,
 		@Nonnull Collection<KeyedStateHandle> stateHandles,
 		StreamCompressionDecorator keyGroupCompressionDecorator,
@@ -197,6 +201,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 			localRecoveryConfig,
 			priorityQueueStateType,
 			ttlTimeProvider,
+			latencyTrackingStateConfig,
 			metricGroup,
 			stateHandles,
 			keyGroupCompressionDecorator,
@@ -349,6 +354,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 			this.keySerializerProvider.currentSchemaSerializer(),
 			this.executionConfig,
 			this.ttlTimeProvider,
+			latencyTrackingStateConfig,
 			db,
 			kvStateInformation,
 			keyGroupPrefixBytes,

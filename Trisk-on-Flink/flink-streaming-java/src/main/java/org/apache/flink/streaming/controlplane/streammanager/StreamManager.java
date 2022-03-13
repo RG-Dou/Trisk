@@ -208,7 +208,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
 				break;
 			case "VerticalScalingTest":
-				this.controlPolicyList.put("VerticalScalingTest", new VerticalScalingTest(this));
+				this.controlPolicyList.put("VerticalScalingTest", new VerticalScalingTest(this, streamManagerConfiguration.getConfiguration()));
 				break;
 		}
 

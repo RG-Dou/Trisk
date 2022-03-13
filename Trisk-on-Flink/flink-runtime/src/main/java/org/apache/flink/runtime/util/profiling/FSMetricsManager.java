@@ -49,6 +49,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 	private long recordsIn = 0;	// Total number of records ingested since the last flush
 	private long recordsOut = 0;	// Total number of records produced since the last flush
 	private long usefulTime = 0;	// Total period of useful time since last flush
+	private long processingTime = 0;
 	private long waitingTime = 0;	// Total waiting time for input/output buffers since last flush
 	private long latency = 0;	// Total end to end latency
 
@@ -174,6 +175,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			usefulTime += processing + status.getSerializationDuration() + deserializationDuration
 //				+ status.getDeserializationDuration()
 				- status.getWaitingForWriteBufferDuration();
+			processingTime += processing;
 
 //			outputStreamDecorator.println(String.format("%d+%d+%d-%d",
 //				processing, status.getSerializationDuration(), deserializationDuration, status.getWaitingForWriteBufferDuration()));
@@ -193,6 +195,12 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				float endToEndLantecy = (float) latency/recordsIn;
 
 				double utilization = (double) usefulTime / duration;
+				double avgUsefulTime = 0.0;
+				double avgProcessingTime = 0.0;
+				if (recordsIn > 0) {
+					avgUsefulTime = usefulTime / 1000000.0 / recordsIn;
+					avgProcessingTime = processingTime / 1000000.0 / recordsIn;
+				}
 
 				// for network calculus
 //				totalRecordsIn += recordsIn;
@@ -245,6 +253,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 						+ " trueProcessingRate: " + trueProcessingRate + ","
 //						+ " observedOutputRate: " + observedOutputRate + ","
 //						+ " trueOutputRate: " + trueOutputRate + ","
+						+ " avgUsefulTime: " + avgUsefulTime + ","
+						+ " avgProcessingTime: " + avgProcessingTime + ","
 						+ " endToEndLantecy: " + endToEndLantecy + ","
 						+ " utilization: " + String.format("%.2f", utilization);
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
@@ -259,6 +269,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				recordsIn = 0;
 				recordsOut = 0;
 				usefulTime = 0;
+				processingTime = 0;
 				currentWindowStart = 0;
 				latency = 0;
 				epoch++;

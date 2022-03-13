@@ -56,6 +56,7 @@ import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueElement;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSetFactory;
 import org.apache.flink.runtime.state.heap.InternalKeyContext;
+import org.apache.flink.runtime.state.metrics.LatencyTrackingStateConfig;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -211,6 +212,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		TypeSerializer<K> keySerializer,
 		ExecutionConfig executionConfig,
 		TtlTimeProvider ttlTimeProvider,
+		LatencyTrackingStateConfig latencyTrackingStateConfig,
 		RocksDB db,
 		LinkedHashMap<String, RocksDbKvStateInfo> kvStateInformation,
 		int keyGroupPrefixBytes,
@@ -234,6 +236,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 			userCodeClassLoader,
 			executionConfig,
 			ttlTimeProvider,
+			latencyTrackingStateConfig,
 			cancelStreamRegistry,
 			keyGroupCompressionDecorator,
 			keyContext);

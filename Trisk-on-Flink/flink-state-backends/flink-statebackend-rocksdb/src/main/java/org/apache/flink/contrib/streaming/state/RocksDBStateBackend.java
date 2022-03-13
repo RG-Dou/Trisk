@@ -44,6 +44,7 @@ import org.apache.flink.runtime.state.OperatorStateHandle;
 import org.apache.flink.runtime.state.StateBackend;
 import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.filesystem.FsStateBackend;
+import org.apache.flink.runtime.state.metrics.LatencyTrackingStateConfig;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.AbstractID;
 import org.apache.flink.util.DynamicCodeLoadingException;
@@ -375,6 +376,9 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 		} catch (DynamicCodeLoadingException e) {
 			throw new FlinkRuntimeException(e);
 		}
+
+		// configure latency tracking
+		latencyTrackingConfigBuilder = original.latencyTrackingConfigBuilder.configure(config);
 	}
 
 	// ------------------------------------------------------------------------
@@ -521,6 +525,10 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 
 		ExecutionConfig executionConfig = env.getExecutionConfig();
 		StreamCompressionDecorator keyGroupCompressionDecorator = getCompressionDecorator(executionConfig);
+
+		LatencyTrackingStateConfig latencyTrackingStateConfig =
+			latencyTrackingConfigBuilder.setMetricGroup(metricGroup).build();
+		System.out.println("Configure the state latency trace: " + latencyTrackingStateConfig.isEnabled());
 		RocksDBKeyedStateBackendBuilder<K> builder = new RocksDBKeyedStateBackendBuilder<>(
 			operatorIdentifier,
 			env.getUserClassLoader(),
@@ -535,6 +543,7 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 			localRecoveryConfig,
 			getPriorityQueueStateType(),
 			ttlTimeProvider,
+			latencyTrackingStateConfig,
 			metricGroup,
 			stateHandles,
 			keyGroupCompressionDecorator,
