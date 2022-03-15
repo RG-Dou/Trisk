@@ -25,6 +25,7 @@ import org.apache.flink.api.common.state.State;
 import org.apache.flink.api.common.state.StateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.internal.InternalReducingState;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -32,6 +33,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.rocksdb.ColumnFamilyHandle;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * {@link ReducingState} implementation that stores state in RocksDB.
@@ -61,10 +63,12 @@ class RocksDBReducingState<K, N, V>
 			TypeSerializer<N> namespaceSerializer,
 			TypeSerializer<V> valueSerializer,
 			V defaultValue,
+			String stateName,
+			MetricGroup metricGroup,
 			ReduceFunction<V> reduceFunction,
 			RocksDBKeyedStateBackend<K> backend) {
 
-		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, backend);
+		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, stateName, metricGroup, backend);
 		this.reduceFunction = reduceFunction;
 	}
 
@@ -157,6 +161,7 @@ class RocksDBReducingState<K, N, V>
 
 	@SuppressWarnings("unchecked")
 	static <K, N, SV, S extends State, IS extends S> IS create(
+		MetricGroup metricGroup,
 		StateDescriptor<S, SV> stateDesc,
 		Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult,
 		RocksDBKeyedStateBackend<K> backend) {
@@ -165,6 +170,8 @@ class RocksDBReducingState<K, N, V>
 			registerResult.f1.getNamespaceSerializer(),
 			registerResult.f1.getStateSerializer(),
 			stateDesc.getDefaultValue(),
+			stateDesc.getName(),
+			metricGroup,
 			((ReducingStateDescriptor<SV>) stateDesc).getReduceFunction(),
 			backend);
 	}

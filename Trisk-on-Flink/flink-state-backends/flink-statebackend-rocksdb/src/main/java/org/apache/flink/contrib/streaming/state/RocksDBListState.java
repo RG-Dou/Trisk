@@ -26,6 +26,7 @@ import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.StateSnapshotTransformer;
 import org.apache.flink.runtime.state.internal.InternalListState;
@@ -83,9 +84,11 @@ class RocksDBListState<K, N, V>
 			TypeSerializer<N> namespaceSerializer,
 			TypeSerializer<List<V>> valueSerializer,
 			List<V> defaultValue,
+			String stateName,
+			MetricGroup metricGroup,
 			RocksDBKeyedStateBackend<K> backend) {
 
-		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, backend);
+		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, stateName, metricGroup, backend);
 
 		ListSerializer<V> castedListSerializer = (ListSerializer<V>) valueSerializer;
 		this.elementSerializer = castedListSerializer.getElementSerializer();
@@ -116,6 +119,11 @@ class RocksDBListState<K, N, V>
 		try {
 			byte[] key = serializeCurrentKeyWithGroupAndNamespace();
 			byte[] valueBytes = backend.db.get(columnFamily, key);
+
+			if(valueBytes != null){
+				updateItemFrequency(key);
+				updateStateSize(valueBytes.length);
+			}
 			return deserializeList(valueBytes);
 		} catch (RocksDBException e) {
 			throw new FlinkRuntimeException("Error while retrieving data from RocksDB", e);
@@ -272,6 +280,7 @@ class RocksDBListState<K, N, V>
 
 	@SuppressWarnings("unchecked")
 	static <E, K, N, SV, S extends State, IS extends S> IS create(
+		MetricGroup metricGroup,
 		StateDescriptor<S, SV> stateDesc,
 		Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult,
 		RocksDBKeyedStateBackend<K> backend) {
@@ -280,6 +289,8 @@ class RocksDBListState<K, N, V>
 			registerResult.f1.getNamespaceSerializer(),
 			(TypeSerializer<List<E>>) registerResult.f1.getStateSerializer(),
 			(List<E>) stateDesc.getDefaultValue(),
+			stateDesc.getName(),
+			metricGroup,
 			backend);
 	}
 

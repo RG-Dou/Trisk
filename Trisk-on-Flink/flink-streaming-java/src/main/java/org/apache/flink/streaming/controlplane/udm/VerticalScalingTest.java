@@ -113,8 +113,12 @@ public class VerticalScalingTest extends AbstractController {
 			try {
 //				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
-				Thread.sleep(5000);
+				Thread.sleep(30000);
 				mRetriever.init();
+				while (true) {
+					Thread.sleep(5000);
+					mRetriever.updateMetrics();
+				}
 				//vScalingTest();
 
 			} catch (InterruptedException e) {

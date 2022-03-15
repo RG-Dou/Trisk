@@ -22,6 +22,10 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.queryablestate.client.state.serialization.KvStateSerializer;
 import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.runtime.state.internal.InternalKvState;
@@ -34,7 +38,8 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Base class for {@link State} implementations that store state in a RocksDB database.
@@ -73,6 +78,8 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 
 	private final RocksDBSerializedCompositeKeyBuilder<K> sharedKeyNamespaceSerializer;
 
+	private final PutStatsMetrics putStatsMetrics;
+
 	/**
 	 * Creates a new RocksDB backed state.
 	 *
@@ -87,6 +94,8 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 			TypeSerializer<N> namespaceSerializer,
 			TypeSerializer<V> valueSerializer,
 			V defaultValue,
+			String stateName,
+			MetricGroup metricGroup,
 			RocksDBKeyedStateBackend<K> backend) {
 
 		this.namespaceSerializer = namespaceSerializer;
@@ -101,6 +110,8 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		this.dataOutputView = new DataOutputSerializer(128);
 		this.dataInputView = new DataInputDeserializer();
 		this.sharedKeyNamespaceSerializer = backend.getSharedRocksKeyBuilder();
+
+		this.putStatsMetrics = new PutStatsMetrics(metricGroup, stateName);
 	}
 
 	// ------------------------------------------------------------------------
@@ -239,5 +250,71 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 	@Override
 	public StateIncrementalVisitor<K, N, V> getStateIncrementalVisitor(int recommendedMaxNumberOfReturnedRecords) {
 		throw new UnsupportedOperationException("Global state entry iterator is unsupported for RocksDb backend");
+	}
+
+	public void updateItemFrequency(byte[] key){
+		putStatsMetrics.updateGetItemFrequency(key);
+	}
+
+	public void updateStateSize(long size){
+		putStatsMetrics.updateStateSize(size);
+	}
+
+	public static class PutStatsMetrics {
+		final MetricGroup metricGroup;
+		protected static final String STATE_NAME_KEY = "state_name";
+		protected static final String ITEM_FREQUENCY = "itemFrequency";
+		protected static final String STATE_SIZE = "stateSize";
+		private final ItemFrequencyGauge itemFrequencyGauge = new ItemFrequencyGauge();
+		private final AvgStateSizeGauge stateSizeGauge = new AvgStateSizeGauge();
+
+		private PutStatsMetrics(MetricGroup metricGroup, String stateName) {
+			this.metricGroup =  metricGroup.addGroup(STATE_NAME_KEY, stateName);
+			this.metricGroup.gauge(ITEM_FREQUENCY, itemFrequencyGauge);
+			this.metricGroup.gauge(STATE_SIZE, stateSizeGauge);
+		}
+
+		private void updateGetItemFrequency(final byte[] key){
+			itemFrequencyGauge.putItem(key);
+		}
+
+		private void updateStateSize(final long size){
+			stateSizeGauge.putStateSize(size);
+		}
+	}
+
+	public static class ItemFrequencyGauge implements Gauge<Collection<AtomicLong>> {
+
+		private final Map<byte[], AtomicLong> itemFrequency = new HashMap<>();
+
+		public void putItem(byte[] key) {
+			if(itemFrequency.containsKey(key)){
+				itemFrequency.get(key).addAndGet(1);
+			} else {
+				itemFrequency.put(key, new AtomicLong(1));
+			}
+		}
+
+		@Override
+		public Collection<AtomicLong> getValue() {
+			return itemFrequency.values();
+		}
+	}
+
+	public static class AvgStateSizeGauge implements Gauge<Double> {
+
+		private double avgStateSize = 0;
+		private long counter = 0;
+
+		public void putStateSize(long stateSize) {
+			double ratio = counter*1.0/(counter+1);
+			avgStateSize = avgStateSize * ratio + stateSize * (1 - ratio);
+			counter++;
+		}
+
+		@Override
+		public Double getValue() {
+			return avgStateSize;
+		}
 	}
 }

@@ -23,6 +23,7 @@ import org.apache.flink.api.common.state.StateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.internal.InternalValueState;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -57,9 +58,11 @@ class RocksDBValueState<K, N, V>
 			TypeSerializer<N> namespaceSerializer,
 			TypeSerializer<V> valueSerializer,
 			V defaultValue,
+			String stateName,
+			MetricGroup metricGroup,
 			RocksDBKeyedStateBackend<K> backend) {
 
-		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, backend);
+		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, stateName, metricGroup, backend);
 	}
 
 	@Override
@@ -86,6 +89,10 @@ class RocksDBValueState<K, N, V>
 			if (valueBytes == null) {
 				return getDefaultValue();
 			}
+
+			updateItemFrequency(serializeCurrentKeyWithGroupAndNamespace());
+			updateStateSize(valueBytes.length);
+
 			dataInputView.setBuffer(valueBytes);
 			return valueSerializer.deserialize(dataInputView);
 		} catch (IOException | RocksDBException e) {
@@ -111,6 +118,7 @@ class RocksDBValueState<K, N, V>
 
 	@SuppressWarnings("unchecked")
 	static <K, N, SV, S extends State, IS extends S> IS create(
+		MetricGroup metricGroup,
 		StateDescriptor<S, SV> stateDesc,
 		Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult,
 		RocksDBKeyedStateBackend<K> backend) {
@@ -119,6 +127,8 @@ class RocksDBValueState<K, N, V>
 			registerResult.f1.getNamespaceSerializer(),
 			registerResult.f1.getStateSerializer(),
 			stateDesc.getDefaultValue(),
+			stateDesc.getName(),
+			metricGroup,
 			backend);
 	}
 }

@@ -26,6 +26,7 @@ import org.apache.flink.api.common.typeutils.base.MapSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.queryablestate.client.state.serialization.KvStateSerializer;
 import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
@@ -85,9 +86,11 @@ class RocksDBMapState<K, N, UK, UV>
 			TypeSerializer<N> namespaceSerializer,
 			TypeSerializer<Map<UK, UV>> valueSerializer,
 			Map<UK, UV> defaultValue,
+			String stateName,
+			MetricGroup metricGroup,
 			RocksDBKeyedStateBackend<K> backend) {
 
-		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, backend);
+		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, stateName, metricGroup, backend);
 
 		Preconditions.checkState(valueSerializer instanceof MapSerializer, "Unexpected serializer type.");
 
@@ -119,6 +122,11 @@ class RocksDBMapState<K, N, UK, UV>
 	public UV get(UK userKey) throws IOException, RocksDBException {
 		byte[] rawKeyBytes = serializeCurrentKeyWithGroupAndNamespacePlusUserKey(userKey, userKeySerializer);
 		byte[] rawValueBytes = backend.db.get(columnFamily, rawKeyBytes);
+
+		if(rawValueBytes != null){
+			updateItemFrequency(rawKeyBytes);
+			updateStateSize(rawValueBytes.length);
+		}
 
 		return (rawValueBytes == null ? null : deserializeUserValue(dataInputView, rawValueBytes, userValueSerializer));
 	}
@@ -159,6 +167,10 @@ class RocksDBMapState<K, N, UK, UV>
 		byte[] rawKeyBytes = serializeCurrentKeyWithGroupAndNamespacePlusUserKey(userKey, userKeySerializer);
 		byte[] rawValueBytes = backend.db.get(columnFamily, rawKeyBytes);
 
+		if(rawValueBytes != null){
+			updateItemFrequency(rawKeyBytes);
+			updateStateSize(rawValueBytes.length);
+		}
 		return (rawValueBytes != null);
 	}
 
@@ -628,6 +640,7 @@ class RocksDBMapState<K, N, UK, UV>
 
 	@SuppressWarnings("unchecked")
 	static <UK, UV, K, N, SV, S extends State, IS extends S> IS create(
+		MetricGroup metricGroup,
 		StateDescriptor<S, SV> stateDesc,
 		Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult,
 		RocksDBKeyedStateBackend<K> backend) {
@@ -636,6 +649,8 @@ class RocksDBMapState<K, N, UK, UV>
 			registerResult.f1.getNamespaceSerializer(),
 			(TypeSerializer<Map<UK, UV>>) registerResult.f1.getStateSerializer(),
 			(Map<UK, UV>) stateDesc.getDefaultValue(),
+			stateDesc.getName(),
+			metricGroup,
 			backend);
 	}
 

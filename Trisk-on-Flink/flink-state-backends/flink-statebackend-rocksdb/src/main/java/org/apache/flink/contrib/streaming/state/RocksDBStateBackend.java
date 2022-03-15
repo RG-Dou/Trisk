@@ -528,7 +528,6 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 
 		LatencyTrackingStateConfig latencyTrackingStateConfig =
 			latencyTrackingConfigBuilder.setMetricGroup(metricGroup).build();
-		System.out.println("Configure the state latency trace: " + latencyTrackingStateConfig.isEnabled());
 		RocksDBKeyedStateBackendBuilder<K> builder = new RocksDBKeyedStateBackendBuilder<>(
 			operatorIdentifier,
 			env.getUserClassLoader(),

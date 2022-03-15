@@ -180,6 +180,7 @@ public class RuntimeEnvironment implements Environment {
 				taskInfo.getTaskNameWithSubtasks(),
 				this.jobVertexId,
 				jobConfiguration,
+				metrics,
 				taskInfo.getIdInModel(),
 				taskInfo.getMaxNumberOfParallelSubtasks());
 		}

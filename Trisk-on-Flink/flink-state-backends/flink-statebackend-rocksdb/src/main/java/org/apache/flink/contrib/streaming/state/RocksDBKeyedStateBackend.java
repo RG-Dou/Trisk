@@ -39,6 +39,7 @@ import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersMana
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
@@ -125,6 +126,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
 	private interface StateFactory {
 		<K, N, SV, S extends State, IS extends S> IS createState(
+			MetricGroup metricGroup,
 			StateDescriptor<S, SV> stateDesc,
 			Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult,
 			RocksDBKeyedStateBackend<K> backend) throws Exception;
@@ -589,6 +591,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 			throw new FlinkRuntimeException(message);
 		}
 		State state = stateFactory.createState(
+			latencyTrackingStateConfig.getMetricGroup(),
 			stateDesc,
 			stateMetaInfo,
 			RocksDBKeyedStateBackend.this);
@@ -654,7 +657,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		}
 		Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult = tryRegisterKvStateInformation(
 			stateDesc, namespaceSerializer, snapshotTransformFactory);
-		return stateFactory.createState(stateDesc, registerResult, RocksDBKeyedStateBackend.this);
+		return stateFactory.createState(latencyTrackingStateConfig.getMetricGroup(), stateDesc, registerResult, RocksDBKeyedStateBackend.this);
 	}
 
 	/**

@@ -59,7 +59,8 @@ class LatencyTrackingMapState<K, N, UK, UV>
     public UV get(UK key) throws Exception {
         if (latencyTrackingStateMetric.trackLatencyOnGet()) {
             return trackLatencyWithException(
-                    () -> original.get(key), MapStateLatencyMetrics.MAP_STATE_GET_LATENCY);
+//                    () -> original.get(key), MapStateLatencyMetrics.MAP_STATE_GET_LATENCY);
+				() -> original.get(key), MapStateLatencyMetrics.MAP_STATE_CACHE_ACCESS_LATENCY);
         } else {
             return original.get(key);
         }
@@ -100,7 +101,8 @@ class LatencyTrackingMapState<K, N, UK, UV>
         if (latencyTrackingStateMetric.trackLatencyOnContains()) {
             return trackLatencyWithException(
                     () -> original.contains(key),
-                    MapStateLatencyMetrics.MAP_STATE_CONTAINS_LATENCY);
+//                    MapStateLatencyMetrics.MAP_STATE_CONTAINS_LATENCY);
+					MapStateLatencyMetrics.MAP_STATE_CACHE_ACCESS_LATENCY);
         } else {
             return original.contains(key);
         }
@@ -228,6 +230,8 @@ class LatencyTrackingMapState<K, N, UK, UV>
         private static final String MAP_STATE_ITERATOR_NEXT_LATENCY = "mapStateIteratorNextLatency";
         private static final String MAP_STATE_ITERATOR_REMOVE_LATENCY =
                 "mapStateIteratorRemoveLatency";
+
+		private static final String MAP_STATE_CACHE_ACCESS_LATENCY = "mapStateCacheAccessLatency";
 
         private int getCount = 0;
         private int iteratorRemoveCount = 0;

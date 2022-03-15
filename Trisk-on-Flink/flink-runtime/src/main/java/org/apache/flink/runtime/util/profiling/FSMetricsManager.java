@@ -18,8 +18,12 @@
 
 package org.apache.flink.runtime.util.profiling;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,11 +79,14 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 	private final OutputStreamDecorator outputStreamDecorator;
 
+
+	private final SubTaskLatencyMetrics latencyMetrics;
+
 	/**
 	 * @param taskDescription the String describing the owner operator instance
 	 * @param jobConfiguration this job's configuration
 	 */
-	public FSMetricsManager(String taskDescription, JobVertexID jobVertexId, Configuration jobConfiguration, int idInModel, int maximumKeygroups) {
+	public FSMetricsManager(String taskDescription, JobVertexID jobVertexId, Configuration jobConfiguration, TaskMetricGroup metricGroup, int idInModel, int maximumKeygroups) {
 		numKeygroups = maximumKeygroups;
 
 		taskId = taskDescription;
@@ -109,6 +116,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 		}
 		LOG.info("###### " + getJobVertexId() + " new task created");
 		outputStreamDecorator = new OutputStreamDecorator(outputStream);
+		this.latencyMetrics = new SubTaskLatencyMetrics(metricGroup);
 	}
 
 	public void updateTaskId(String taskDescription, Integer idInModel) {
@@ -230,22 +238,9 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				} else {
 					keyGroupinput = new StringBuilder("0");
 				}
-
-				// log the rates: one file per epoch
-//				String ratesLine = jobVertexId + ","
-//					+ workerName + "-" + instanceId + ","
-//					+ numInstances  + ","
-//					+ trueProcessingRate + ","
-//					+ trueOutputRate + ","
-//					+ observedProcessingRate + ","
-//					+ observedOutputRate + ","
-//					+ endToEndLantecy + ","
-//					+ totalRecordsIn + ","
-//					+ totalRecordsOut + ","
-//					+ utilization + ","
-//					+ keyGroupOutput + ","
-//					+ keyGroupinput + ","
-//					+ System.currentTimeMillis();
+				latencyMetrics.setTupleLatency(endToEndLantecy);
+				latencyMetrics.setQueuingTime(endToEndLantecy - avgUsefulTime);
+				latencyMetrics.setServiceTime(avgUsefulTime);
 
 					String ratesLine = jobVertexId + ","
 						+ workerName + "-" + instanceId + ","
@@ -281,28 +276,6 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 	@Override
 	public void groundTruth(int keyGroup, long arrivalTs, long completionTs) {
-//		if (completionTs - lastTimeSlot >= 1000) {
-//			// print out to stdout, and clear the state
-//			Iterator it = kgLatencyMap.entrySet().iterator();
-//			while (it.hasNext()) {
-//				Map.Entry kv = (Map.Entry)it.next();
-//				int curKg = (int) kv.getKey();
-//				long sumLatency = (long) kv.getValue();
-//				int nRecords = kgNRecordsMap.get(curKg);
-//				float avgLatency = (float) sumLatency / nRecords;
-////				System.out.println("timeslot: " + lastTimeSlot + " keygroup: "
-////					+ curKg + " records: " + nRecords + " avglatency: " + avgLatency);
-//				System.out.println(String.format(jobVertexId.toString() + " GroundTruth: %d %d %d %f", lastTimeSlot, curKg, nRecords, avgLatency));
-//			}
-//			kgLatencyMap.clear();
-//			kgNRecordsMap.clear();
-//			lastTimeSlot = completionTs / 1000 * 1000;
-//		}
-//		kgNRecordsMap.put(keyGroup,
-//			kgNRecordsMap.getOrDefault(keyGroup, 0)+1);
-//		kgLatencyMap.put(keyGroup,
-//			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
-//		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
 		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, (completionTs - arrivalTs)));
 	}
 
@@ -401,24 +374,6 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 						keyGroupOutput = new StringBuilder("0");
 					}
 
-					// log the rates: one file per epoch
-//					String ratesLine = jobVertexId + ","
-//						+ workerName + "-" + instanceId + ","
-//						+ numInstances  + ","
-//						+ currentWindowStart + ","
-//						+ 0 + ","
-//	//						+ trueOutputRate + ","
-//						+ 0 + ","
-//						+ observedOutputRate + ","
-//						+ 0 + "," // end to end latency should be 0.
-//						+ 0 + ","
-//						+ totalRecordsOut + ","
-//						+ 0 + ","
-//						+ keyGroupOutput + ","
-//						+ 0 + ","
-//						+ System.currentTimeMillis();
-//					List<String> rates = Arrays.asList(ratesLine);
-
 					String ratesLine = jobVertexId + ","
 						+ workerName + "-" + instanceId + ","
 						+ " observedOutputRate: " + observedOutputRate + ","
@@ -493,22 +448,6 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				keyGroupinput = new StringBuilder("0");
 			}
 
-			// log the rates: one file per epoch
-//			String ratesLine = jobVertexId + ","
-//				+ workerName + "-" + instanceId  + ","
-//				+ numInstances  + ","
-//				+ trueProcessingRate + ","
-//				+ 0 + ","
-//				+ 0 + ","
-//				+ 0 + ","
-//				+ 0 + ","
-//				+ totalRecordsIn + ","
-//				+ totalRecordsOut + ","
-//				+ 0.1 + ","
-//				+ keyGroupOutput + ","
-//				+ keyGroupinput + ","
-//				+ System.currentTimeMillis();
-
 			String ratesLine = jobVertexId + ","
 				+ workerName + "-" + instanceId + ","
 //						+ " trueProcessingRate: " + trueProcessingRate + ","
@@ -523,14 +462,6 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			outputStreamDecorator.println(ratesLine);
 			System.out.println(ratesLine);
 
-//			if (taskId.contains("MatchMaker")) {
-//				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " keygroups processed:" + keyGroupinput);
-//			} else if (taskId.contains("Source")) {
-//				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " keygroups output:" + keyGroupOutput);
-//			}
-//			if (taskId.contains("MatchMaker") || taskId.contains("Source")) {
-//				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " Completed!");
-//			}
 			// clear counters
 			recordsIn = 0;
 			recordsOut = 0;
@@ -542,4 +473,63 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			status.clearKeygroups();
 		}
 	}
+
+	public static class SubTaskLatencyMetrics {
+		final MetricGroup metricGroup;
+
+		private static final String SERVICE_TIME = "serviceTime";
+		private static final String QUEUING_TIME = "queuingTime";
+		private static final String TUPLE_LATENCY = "tupleLatency";
+
+		protected final LatencyGauge serviceTimeGauge = new LatencyGauge();
+		protected final LatencyGauge queueTimeGauge = new LatencyGauge();
+		protected final LatencyGauge avgTupleLatencyGauge = new LatencyGauge();
+
+		private SubTaskLatencyMetrics(MetricGroup metricGroup) {
+			this.metricGroup = metricGroup;
+			metricGroup.gauge(SERVICE_TIME, serviceTimeGauge);
+			metricGroup.gauge(QUEUING_TIME, queueTimeGauge);
+			metricGroup.gauge(TUPLE_LATENCY, avgTupleLatencyGauge);
+		}
+
+		public double getServiceTimeGauge() {
+			return serviceTimeGauge.getValue();
+		}
+
+		public void setServiceTime(double time){
+			serviceTimeGauge.setLatency(time);
+		}
+
+		public double getQueueTimeGauge() {
+			return queueTimeGauge.getValue();
+		}
+
+		public void setQueuingTime(double time){
+			queueTimeGauge.setLatency(time);
+		}
+
+		public double getAvgTupleLatencyGauge() {
+			return avgTupleLatencyGauge.getValue();
+		}
+
+		public void setTupleLatency(double time){
+			System.out.println("Set per tuple latency: " + time);
+			avgTupleLatencyGauge.setLatency(time);
+		}
+	}
+
+	public static class LatencyGauge implements Gauge<Double> {
+
+		private volatile double currentLatency = 0.0;
+
+		public void setLatency(double latency) {
+			currentLatency = latency;
+		}
+
+		@Override
+		public Double getValue() {
+			return currentLatency;
+		}
+	}
+
 }

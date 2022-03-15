@@ -19,6 +19,7 @@
 package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.internal.InternalAppendingState;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -45,8 +46,10 @@ abstract class AbstractRocksDBAppendingState <K, N, IN, SV, OUT>
 		TypeSerializer<N> namespaceSerializer,
 		TypeSerializer<SV> valueSerializer,
 		SV defaultValue,
+		String stateName,
+		MetricGroup metricGroup,
 		RocksDBKeyedStateBackend<K> backend) {
-		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, backend);
+		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, stateName, metricGroup, backend);
 	}
 
 	@Override
@@ -60,6 +63,9 @@ abstract class AbstractRocksDBAppendingState <K, N, IN, SV, OUT>
 			if (valueBytes == null) {
 				return null;
 			}
+
+			updateItemFrequency(key);
+			updateStateSize(valueBytes.length);
 			dataInputView.setBuffer(valueBytes);
 			return valueSerializer.deserialize(dataInputView);
 		} catch (IOException | RocksDBException e) {

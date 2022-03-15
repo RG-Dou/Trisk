@@ -25,6 +25,7 @@ import org.apache.flink.api.common.state.State;
 import org.apache.flink.api.common.state.StateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.internal.InternalAggregatingState;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -64,10 +65,12 @@ class RocksDBAggregatingState<K, N, T, ACC, R>
 			TypeSerializer<N> namespaceSerializer,
 			TypeSerializer<ACC> valueSerializer,
 			ACC defaultValue,
+			String stateName,
+			MetricGroup metricGroup,
 			AggregateFunction<T, ACC, R> aggFunction,
 			RocksDBKeyedStateBackend<K> backend) {
 
-		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, backend);
+		super(columnFamily, namespaceSerializer, valueSerializer, defaultValue, stateName, metricGroup, backend);
 		this.aggFunction = aggFunction;
 	}
 
@@ -164,6 +167,7 @@ class RocksDBAggregatingState<K, N, T, ACC, R>
 
 	@SuppressWarnings("unchecked")
 	static <K, N, SV, S extends State, IS extends S> IS create(
+		MetricGroup metricGroup,
 		StateDescriptor<S, SV> stateDesc,
 		Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult,
 		RocksDBKeyedStateBackend<K> backend) {
@@ -172,6 +176,8 @@ class RocksDBAggregatingState<K, N, T, ACC, R>
 			registerResult.f1.getNamespaceSerializer(),
 			registerResult.f1.getStateSerializer(),
 			stateDesc.getDefaultValue(),
+			stateDesc.getName(),
+			metricGroup,
 			((AggregatingStateDescriptor<?, SV, ?>) stateDesc).getAggregateFunction(),
 			backend);
 	}
