@@ -269,6 +269,8 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		private int keyGroup;
 		private K key;
 
+		//Todo: consider the namespace
+
 		private PutStatsMetrics(MetricGroup metricGroup, String stateName) {
 			this.metricGroup =  metricGroup.addGroup(STATE_NAME_KEY, stateName);
 			this.metricGroup.gauge(ITEM_FREQUENCY, itemFrequencyGauge);
