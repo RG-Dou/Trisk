@@ -121,7 +121,7 @@ class RocksDBListState<K, N, V>
 			byte[] valueBytes = backend.db.get(columnFamily, key);
 
 			if(valueBytes != null){
-				updateItemFrequency(key);
+				updateItemFrequency(null);
 				updateStateSize(valueBytes.length);
 			}
 			return deserializeList(valueBytes);

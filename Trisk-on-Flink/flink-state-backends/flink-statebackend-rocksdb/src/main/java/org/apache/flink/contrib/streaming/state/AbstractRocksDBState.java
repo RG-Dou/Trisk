@@ -22,10 +22,8 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
-import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.queryablestate.client.state.serialization.KvStateSerializer;
 import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.runtime.state.internal.InternalKvState;
@@ -78,7 +76,7 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 
 	private final RocksDBSerializedCompositeKeyBuilder<K> sharedKeyNamespaceSerializer;
 
-	private final PutStatsMetrics putStatsMetrics;
+	private final PutStatsMetrics<K> putStatsMetrics;
 
 	/**
 	 * Creates a new RocksDB backed state.
@@ -111,7 +109,7 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		this.dataInputView = new DataInputDeserializer();
 		this.sharedKeyNamespaceSerializer = backend.getSharedRocksKeyBuilder();
 
-		this.putStatsMetrics = new PutStatsMetrics(metricGroup, stateName);
+		this.putStatsMetrics = new PutStatsMetrics<K>(metricGroup, stateName);
 	}
 
 	// ------------------------------------------------------------------------
@@ -252,7 +250,8 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		throw new UnsupportedOperationException("Global state entry iterator is unsupported for RocksDb backend");
 	}
 
-	public void updateItemFrequency(byte[] key){
+	public void updateItemFrequency(Object key){
+		putStatsMetrics.updateKeyGroup(sharedKeyNamespaceSerializer.keyGroup, sharedKeyNamespaceSerializer.key);
 		putStatsMetrics.updateGetItemFrequency(key);
 	}
 
@@ -260,13 +259,15 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		putStatsMetrics.updateStateSize(size);
 	}
 
-	public static class PutStatsMetrics {
+	public static class PutStatsMetrics<K> {
 		final MetricGroup metricGroup;
 		protected static final String STATE_NAME_KEY = "state_name";
 		protected static final String ITEM_FREQUENCY = "itemFrequency";
 		protected static final String STATE_SIZE = "stateSize";
-		private final ItemFrequencyGauge itemFrequencyGauge = new ItemFrequencyGauge();
+		private final ItemFrequencyGauge<K> itemFrequencyGauge = new ItemFrequencyGauge<K>();
 		private final AvgStateSizeGauge stateSizeGauge = new AvgStateSizeGauge();
+		private int keyGroup;
+		private K key;
 
 		private PutStatsMetrics(MetricGroup metricGroup, String stateName) {
 			this.metricGroup =  metricGroup.addGroup(STATE_NAME_KEY, stateName);
@@ -274,8 +275,14 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 			this.metricGroup.gauge(STATE_SIZE, stateSizeGauge);
 		}
 
-		private void updateGetItemFrequency(final byte[] key){
-			itemFrequencyGauge.putItem(key);
+		private void updateKeyGroup(int keyGroup, K key){
+			this.keyGroup = keyGroup;
+			this.key = key;
+		}
+
+		private void updateGetItemFrequency(Object userKey){
+			System.out.println("keyGroup: " + keyGroup + ", key: " + key + ", userKey: " +userKey);
+			itemFrequencyGauge.putItem(keyGroup, key, userKey);
 		}
 
 		private void updateStateSize(final long size){
@@ -283,25 +290,63 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		}
 	}
 
-	public static class ItemFrequencyGauge implements Gauge<Collection<AtomicLong>> {
+	public static class ItemFrequencyGauge<K> implements Gauge<Collection<AtomicLong>> {
+//	public static class ItemFrequencyGauge<K> implements Gauge<Map<Integer, Map<K, Map<Object, AtomicLong>>>> {
 
-		private final Map<byte[], AtomicLong> itemFrequency = new HashMap<>();
+		private final Map<Integer, Map<K, Map<Object, AtomicLong>>> itemFrequency = new HashMap<>();
+//		private final Map<byte[], AtomicLong> itemFrequency = new HashMap<>();
 
-		public void putItem(byte[] key) {
-			if(itemFrequency.containsKey(key)){
-				itemFrequency.get(key).addAndGet(1);
+		public void putItem(Integer groupId, K key, Object userKey) {
+			if (userKey == null)
+				userKey = key;
+			Map<K, Map<Object, AtomicLong>> keyAndUserKey = itemFrequency.get(groupId);
+			Map<Object, AtomicLong> ukFreq;
+			AtomicLong count;
+			if (keyAndUserKey != null){
+				ukFreq = keyAndUserKey.get(key);
+				if (ukFreq != null){
+					count = ukFreq.get(userKey);
+					if (count != null){
+						count.addAndGet(1);
+					} else {
+						count = new AtomicLong(1);
+						ukFreq.put(userKey, count);
+					}
+				} else {
+					count = new AtomicLong(1);
+					ukFreq = new HashMap<>();
+					ukFreq.put(userKey, count);
+					keyAndUserKey.put(key, ukFreq);
+				}
 			} else {
-				itemFrequency.put(key, new AtomicLong(1));
+				count = new AtomicLong(1);
+				ukFreq = new HashMap<>();
+				ukFreq.put(userKey, count);
+				keyAndUserKey = new HashMap<>();
+				keyAndUserKey.put(key, ukFreq);
+				itemFrequency.put(groupId, keyAndUserKey);
 			}
+//			if(itemFrequency.containsKey(key)){
+//				itemFrequency.get(key).addAndGet(1);
+//			} else {
+//				itemFrequency.put(key, new AtomicLong(1));
+//			}
 		}
 
 		@Override
 		public Collection<AtomicLong> getValue() {
-			return itemFrequency.values();
+//			return itemFrequency;
+			Collection<AtomicLong> results = new ArrayList<>();
+			for(Map.Entry<Integer, Map<K, Map<Object, AtomicLong>>> entry1 : itemFrequency.entrySet()){
+				for(Map.Entry<K, Map<Object, AtomicLong>> entry2 : entry1.getValue().entrySet()){
+					results.addAll(entry2.getValue().values());
+				}
+			}
+			return results;
 		}
 	}
 
-	public static class AvgStateSizeGauge implements Gauge<Double> {
+	public static class AvgStateSizeGauge implements Gauge<Tuple2<Double, Long>> {
 
 		private double avgStateSize = 0;
 		private long counter = 0;
@@ -313,8 +358,8 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		}
 
 		@Override
-		public Double getValue() {
-			return avgStateSize;
+		public Tuple2<Double, Long> getValue() {
+			return new Tuple2<>(avgStateSize, counter);
 		}
 	}
 }

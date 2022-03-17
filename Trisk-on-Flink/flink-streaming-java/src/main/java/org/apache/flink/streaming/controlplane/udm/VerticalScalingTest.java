@@ -35,11 +35,15 @@ public class VerticalScalingTest extends AbstractController {
 	private String REST_SERVER_IP = "trisk.config.rest_server_ip";
 	private String REST_SERVER_PORT = "rest.port";
 	private String JOB_NAME = "trisk.config.job_name";
+	private String UPDATE_INTERVAL = "trisk.config.update_interval";
+
+	private final Long updateInterval;
 
 	public VerticalScalingTest(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor);
 		String jobName = configuration.getString(JOB_NAME, "Nexmark Query3 stateful");
 		mRetriever = new RestfulMetricsRetriever(configuration.getString(REST_SERVER_IP, "localhost"), configuration.getInteger(REST_SERVER_PORT, 8081), jobName);
+		updateInterval = configuration.getLong(UPDATE_INTERVAL, 5000);
 		testingThread = new TestingThread();
 	}
 
@@ -116,7 +120,7 @@ public class VerticalScalingTest extends AbstractController {
 				Thread.sleep(30000);
 				mRetriever.init();
 				while (true) {
-					Thread.sleep(5000);
+					Thread.sleep(updateInterval);
 					mRetriever.updateMetrics();
 				}
 				//vScalingTest();

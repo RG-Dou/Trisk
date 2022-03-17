@@ -36,6 +36,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StateMigrationException;
 
+import org.apache.kafka.common.protocol.types.Field;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -124,7 +125,7 @@ class RocksDBMapState<K, N, UK, UV>
 		byte[] rawValueBytes = backend.db.get(columnFamily, rawKeyBytes);
 
 		if(rawValueBytes != null){
-			updateItemFrequency(rawKeyBytes);
+			updateItemFrequency(userKey);
 			updateStateSize(rawValueBytes.length);
 		}
 
@@ -168,7 +169,7 @@ class RocksDBMapState<K, N, UK, UV>
 		byte[] rawValueBytes = backend.db.get(columnFamily, rawKeyBytes);
 
 		if(rawValueBytes != null){
-			updateItemFrequency(rawKeyBytes);
+			updateItemFrequency(userKey);
 			updateStateSize(rawValueBytes.length);
 		}
 		return (rawValueBytes != null);

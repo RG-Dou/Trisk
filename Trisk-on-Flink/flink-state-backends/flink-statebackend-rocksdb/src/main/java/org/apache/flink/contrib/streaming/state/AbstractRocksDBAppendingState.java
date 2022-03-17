@@ -64,7 +64,7 @@ abstract class AbstractRocksDBAppendingState <K, N, IN, SV, OUT>
 				return null;
 			}
 
-			updateItemFrequency(key);
+			updateItemFrequency(null);
 			updateStateSize(valueBytes.length);
 			dataInputView.setBuffer(valueBytes);
 			return valueSerializer.deserialize(dataInputView);

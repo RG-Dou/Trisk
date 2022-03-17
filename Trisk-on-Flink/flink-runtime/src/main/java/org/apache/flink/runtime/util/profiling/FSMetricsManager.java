@@ -200,7 +200,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				double observedProcessingRate = (recordsIn / (duration / 1000.0)) * 1000000;
 				double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
 				outputStreamDecorator.println(latency + " : " + recordsIn);
-				float endToEndLantecy = (float) latency/recordsIn;
+				float tupleLatency = (float) latency / recordsIn;
 
 				double utilization = (double) usefulTime / duration;
 				double avgUsefulTime = 0.0;
@@ -238,22 +238,29 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				} else {
 					keyGroupinput = new StringBuilder("0");
 				}
-				latencyMetrics.setTupleLatency(endToEndLantecy);
-				latencyMetrics.setQueuingTime(endToEndLantecy - avgUsefulTime);
+				latencyMetrics.setTupleLatency(tupleLatency);
+				latencyMetrics.setQueuingTime(tupleLatency - avgUsefulTime);
 				latencyMetrics.setServiceTime(avgUsefulTime);
+				String ratesLine = jobVertexId + ","
+					+ workerName + "-" + instanceId + ","
+					+ " avgProcessingTime: " + avgProcessingTime + ","
+					+ " endToEndLantecy: " + tupleLatency + ","
+					+ " avgUsefulTime: " + avgUsefulTime + ","
+					+ " recordsIn: " + recordsIn;
 
-					String ratesLine = jobVertexId + ","
-						+ workerName + "-" + instanceId + ","
-						+ " observedProcessingRate: " + observedProcessingRate + ","
-						+ " trueProcessingRate: " + trueProcessingRate + ","
-//						+ " observedOutputRate: " + observedOutputRate + ","
-//						+ " trueOutputRate: " + trueOutputRate + ","
-						+ " avgUsefulTime: " + avgUsefulTime + ","
-						+ " avgProcessingTime: " + avgProcessingTime + ","
-						+ " endToEndLantecy: " + endToEndLantecy + ","
-						+ " utilization: " + String.format("%.2f", utilization);
-//						+ " totalRecordsIn: " + totalRecordsIn + ","
-//						+ " totalRecordsOut: " + totalRecordsOut;
+
+//				String ratesLine = jobVertexId + ","
+//						+ workerName + "-" + instanceId + ","
+//						+ " observedProcessingRate: " + observedProcessingRate + ","
+//						+ " trueProcessingRate: " + trueProcessingRate + ","
+////						+ " observedOutputRate: " + observedOutputRate + ","
+////						+ " trueOutputRate: " + trueOutputRate + ","
+//						+ " avgUsefulTime: " + avgUsefulTime + ","
+//						+ " avgProcessingTime: " + avgProcessingTime + ","
+//						+ " endToEndLantecy: " + endToEndLantecy + ","
+//						+ " utilization: " + String.format("%.2f", utilization);
+////						+ " totalRecordsIn: " + totalRecordsIn + ","
+////						+ " totalRecordsOut: " + totalRecordsOut;
 
 					//Issus: vScaling
 					outputStreamDecorator.println(ratesLine);
@@ -513,7 +520,6 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 		}
 
 		public void setTupleLatency(double time){
-			System.out.println("Set per tuple latency: " + time);
 			avgTupleLatencyGauge.setLatency(time);
 		}
 	}

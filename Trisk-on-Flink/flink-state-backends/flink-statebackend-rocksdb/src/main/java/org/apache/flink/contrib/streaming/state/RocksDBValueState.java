@@ -90,7 +90,7 @@ class RocksDBValueState<K, N, V>
 				return getDefaultValue();
 			}
 
-			updateItemFrequency(serializeCurrentKeyWithGroupAndNamespace());
+			updateItemFrequency(null);
 			updateStateSize(valueBytes.length);
 
 			dataInputView.setBuffer(valueBytes);

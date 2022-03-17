@@ -58,6 +58,9 @@ class RocksDBSerializedCompositeKeyBuilder<K> {
 	@Nonnegative
 	private int afterKeyMark;
 
+	public int keyGroup;
+	public K key;
+
 	public RocksDBSerializedCompositeKeyBuilder(
 		@Nonnull TypeSerializer<K> keySerializer,
 		@Nonnegative int keyGroupPrefixBytes,
@@ -149,6 +152,9 @@ class RocksDBSerializedCompositeKeyBuilder<K> {
 
 		// clear buffer and mark
 		resetFully();
+
+		this.keyGroup = keyGroupId;
+		this.key = key;
 
 		// write key-group
 		RocksDBKeySerializationUtils.writeKeyGroup(

@@ -159,12 +159,14 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 			if (deserializationDuration > 0) {
 //				metricsManager.addDeserialization(deserializationDuration);
-				endToEndLatency += processingDuration;
+//				endToEndLatency += processingDuration;
 //				metricsManager.inputBufferConsumed(System.nanoTime(),
 //					deserializationDuration, processingDuration,
 //					recordsProcessed, endToEndLatency);
+//				metricsManager.inputBufferConsumed(System.nanoTime(), deserializationDuration,
+//					processingDuration, recordsProcessed, endToEndLatency / 1_000_000L);
 				metricsManager.inputBufferConsumed(System.nanoTime(), deserializationDuration,
-					processingDuration, recordsProcessed, endToEndLatency / 1_000_000L);
+					processingDuration, recordsProcessed, endToEndLatency);
 
 				processingDuration = 0;
 				recordsProcessed = 0;
@@ -203,7 +205,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 //			long processingDelay = System.nanoTime() - processingStart;
 			long processingDelay = record.getProcessTime();
 			processingDuration += processingDelay;
-			long latency = queuingDelay + processingDelay/1000000;
+//			long latency = queuingDelay + processingDelay/1000000;
+			long latency = System.currentTimeMillis() - record.getLatencyTimestamp();
 			endToEndLatency += latency;
 			metricsManager.groundTruth(record.getLatencyTimestamp(), latency);
 		} else if (recordOrMark.isWatermark()) {
