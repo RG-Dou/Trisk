@@ -26,6 +26,7 @@ import javax.annotation.concurrent.GuardedBy;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static org.apache.flink.util.Preconditions.checkState;
@@ -70,6 +71,50 @@ final class SharedResources {
 			LeasedResource<T> resource = (LeasedResource<T>) reservedResources.get(type);
 			if (resource == null) {
 				resource = createResource(initializer, sizeForInitialization);
+				reservedResources.put(type, resource);
+			}
+
+			resource.addLeaseHolder(leaseHolder);
+			return resource;
+		}
+		finally {
+			lock.unlock();
+		}
+	}
+
+	// Issue: vScaling
+	/**
+	 * Gets the shared memory resource for the given owner and registers a lease. If the resource
+	 * does not yet exist, it will be created via the given initializer function.
+	 *
+	 * <p>The resource must be released when no longer used. That releases the lease. When all leases are
+	 * released, the resource is disposed.
+	 */
+	<T extends AutoCloseable> ResourceAndSize<T> getOrAllocateSharedResource(
+		String type,
+		Object leaseHolder,
+		LongFunctionWithException<T, Exception> initializer,
+		BiConsumer<T, Long> resizer,
+		long sizeForInitialization) throws Exception {
+
+		// We could be stuck on this lock for a while, in cases where another initialization is currently
+		// happening and the initialization is expensive.
+		// We lock interruptibly here to allow for faster exit in case of cancellation errors.
+		try {
+			lock.lockInterruptibly();
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new MemoryAllocationException("Interrupted while acquiring memory");
+		}
+
+		try {
+			// we cannot use "computeIfAbsent()" here because the computing function may throw an exception.
+			@SuppressWarnings("unchecked")
+			LeasedResource<T> resource = (LeasedResource<T>) reservedResources.get(type);
+			if (resource == null) {
+				resource = createResource(initializer, sizeForInitialization);
+				resource.setResourceResizer(resizer);
 				reservedResources.put(type, resource);
 			}
 
@@ -131,6 +176,16 @@ final class SharedResources {
 		return new LeasedResource<>(resource, size);
 	}
 
+	//Issue: vScaling
+	public boolean resize(long target){
+		String STATE_MEMORY = "state-rocks-managed-memory";
+		if(reservedResources.containsKey(STATE_MEMORY)){
+			LeasedResource<?> resource = reservedResources.get(STATE_MEMORY);
+			return resource.resize(target);
+		}
+		return false;
+	}
+
 	// ------------------------------------------------------------------------
 
 	/**
@@ -151,7 +206,11 @@ final class SharedResources {
 
 		private final T resourceHandle;
 
-		private final long size;
+//		private final long size;
+		private long size;
+
+		// Issue: vScaling
+		private BiConsumer<T, Long> resourceResizer;
 
 		private boolean disposed;
 
@@ -184,6 +243,21 @@ final class SharedResources {
 				disposed = true;
 				resourceHandle.close();
 			}
+		}
+
+		//Issue: vScaling
+		public boolean resize(long newSize){
+			if(resourceResizer != null){
+				size = newSize;
+				resourceResizer.accept(resourceHandle, newSize);
+				return true;
+			} else {
+				return false;
+			}
+		}
+
+		public void setResourceResizer(BiConsumer<T, Long> resizer){
+			this.resourceResizer = resizer;
 		}
 	}
 }

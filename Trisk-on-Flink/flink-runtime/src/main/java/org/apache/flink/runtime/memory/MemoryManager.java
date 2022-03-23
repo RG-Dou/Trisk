@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static org.apache.flink.core.memory.MemorySegmentFactory.allocateOffHeapUnsafeMemory;
@@ -487,6 +488,19 @@ public class MemoryManager {
 		return getSharedMemoryResourceForManagedMemory(type, initializer, 1.0);
 	}
 
+	// Issue: vScaling
+	/**
+	 * Acquires a shared memory resource, that uses all the memory of this memory manager.
+	 * This method behaves otherwise exactly as {@link #getSharedMemoryResourceForManagedMemory(String, LongFunctionWithException, double)}.
+	 */
+	public <T extends AutoCloseable> OpaqueMemoryResource<T> getSharedMemoryResourceForManagedMemory(
+		String type,
+		LongFunctionWithException<T, Exception> initializer,
+		BiConsumer<T, Long> resizer) throws Exception {
+
+		return getSharedMemoryResourceForManagedMemory(type, initializer, resizer,1.0);
+	}
+
 	/**
 	 * Acquires a shared memory resource, identified by a type string. If the resource already exists, this
 	 * returns a descriptor to the resource. If the resource does not yet exist, the given memory fraction
@@ -546,6 +560,67 @@ public class MemoryManager {
 		return new OpaqueMemoryResource<>(resource.resourceHandle(), size, disposer);
 	}
 
+	//Issue: vScaling
+	/**
+	 * Acquires a shared memory resource, identified by a type string. If the resource already exists, this
+	 * returns a descriptor to the resource. If the resource does not yet exist, the given memory fraction
+	 * is reserved and the resource is initialized with that size.
+	 *
+	 * <p>The memory for the resource is reserved from the memory budget of this memory manager (thus
+	 * determining the size of the resource), but resource itself is opaque, meaning the memory manager
+	 * does not understand its structure.
+	 *
+	 * <p>The OpaqueMemoryResource object returned from this method must be closed once not used any further.
+	 * Once all acquisitions have closed the object, the resource itself is closed.
+	 *
+	 * <p><b>Important:</b> The failure semantics are as follows: If the memory manager fails to reserve
+	 * the memory, the external resource initializer will not be called. If an exception is thrown when the
+	 * opaque resource is closed (last lease is released), the memory manager will still un-reserve the
+	 * memory to make sure its own accounting is clean. The exception will need to be handled by the caller of
+	 * {@link OpaqueMemoryResource#close()}. For example, if this indicates that native memory was not released
+	 * and the process might thus have a memory leak, the caller can decide to kill the process as a result.
+	 */
+	public <T extends AutoCloseable> OpaqueMemoryResource<T> getSharedMemoryResourceForManagedMemory(
+		String type,
+		LongFunctionWithException<T, Exception> initializer,
+		BiConsumer<T, Long> resizer,
+		double fractionToInitializeWith) throws Exception {
+
+		// if we need to allocate the resource (no shared resource allocated, yet), this would be the size to use
+		final long numBytes = computeMemorySize(fractionToInitializeWith);
+
+		// initializer and releaser as functions that are pushed into the SharedResources,
+		// so that the SharedResources can decide in (thread-safely execute) when initialization
+		// and release should happen
+		final LongFunctionWithException<T, Exception> reserveAndInitialize = (size) -> {
+			try {
+				reserveMemory(type, size);
+			} catch (MemoryReservationException e) {
+				throw new MemoryAllocationException("Could not created the shared memory resource of size " + size +
+					". Not enough memory left to reserve from the slot's managed memory.", e);
+			}
+
+			return initializer.apply(size);
+		};
+
+		final Consumer<Long> releaser = (size) -> releaseMemory(type, size);
+
+		// This object identifies the lease in this request. It is used only to identify the release operation.
+		// Using the object to represent the lease is a bit nicer safer than just using a reference counter.
+		final Object leaseHolder = new Object();
+
+		final SharedResources.ResourceAndSize<T> resource =
+			sharedResources.getOrAllocateSharedResource(type, leaseHolder, reserveAndInitialize, resizer, numBytes);
+
+		// the actual size may theoretically be different from what we requested, if allocated it was by
+		// someone else before with a different value for fraction (should not happen in practice, though).
+		final long size = resource.size();
+
+		final ThrowingRunnable<Exception> disposer = () -> sharedResources.release(type, leaseHolder, releaser);
+
+		return new OpaqueMemoryResource<>(resource.resourceHandle(), size, disposer);
+	}
+
 	/**
 	 * Acquires a shared resource, identified by a type string. If the resource already exists, this
 	 * returns a descriptor to the resource. If the resource does not yet exist, the method initializes
@@ -567,6 +642,35 @@ public class MemoryManager {
 
 		final SharedResources.ResourceAndSize<T> resource =
 				sharedResources.getOrAllocateSharedResource(type, leaseHolder, initializer, numBytes);
+
+		final ThrowingRunnable<Exception> disposer = () -> sharedResources.release(type, leaseHolder);
+
+		return new OpaqueMemoryResource<>(resource.resourceHandle(), resource.size(), disposer);
+	}
+
+	// Issue: vScaling
+	/**
+	 * Acquires a shared resource, identified by a type string. If the resource already exists, this
+	 * returns a descriptor to the resource. If the resource does not yet exist, the method initializes
+	 * a new resource using the initializer function and given size.
+	 *
+	 * <p>The resource opaque, meaning the memory manager does not understand its structure.
+	 *
+	 * <p>The OpaqueMemoryResource object returned from this method must be closed once not used any further.
+	 * Once all acquisitions have closed the object, the resource itself is closed.
+	 */
+	public <T extends AutoCloseable> OpaqueMemoryResource<T> getExternalSharedMemoryResource(
+		String type,
+		LongFunctionWithException<T, Exception> initializer,
+		BiConsumer<T, Long> resizer,
+		long numBytes) throws Exception {
+
+		// This object identifies the lease in this request. It is used only to identify the release operation.
+		// Using the object to represent the lease is a bit nicer safer than just using a reference counter.
+		final Object leaseHolder = new Object();
+
+		final SharedResources.ResourceAndSize<T> resource =
+			sharedResources.getOrAllocateSharedResource(type, leaseHolder, initializer, resizer, numBytes);
 
 		final ThrowingRunnable<Exception> disposer = () -> sharedResources.release(type, leaseHolder);
 
@@ -643,23 +747,39 @@ public class MemoryManager {
 	}
 
 	//Issue: vScaling
-	public void shrink(long size){
-		long shrinkPages = size / pageSize;
+	public void shrink(long pages){
 		Preconditions.checkArgument(
 			//Issue: vScaling
-			shrinkPages <= totalNumberOfPages.get(),
+			pages <= totalNumberOfPages.get(),
 			"Cannot shrink more segments %d than the max number %d",
-			shrinkPages,
+			pages,
 			totalNumberOfPages);
 
-		memoryBudget.shrink(size);
-		totalNumberOfPages.addAndGet(-shrinkPages);
+		//Shrink block cache first
+		long totalSize = (totalNumberOfPages.get() - pages) * pageSize;
+		sharedResources.resize(totalSize);
+
+		//Shrink managed memory
+		memoryBudget.shrink(pages * pageSize);
+		totalNumberOfPages.addAndGet(-pages);
 	}
 
 	//Issue: vScaling
-	public void expand(long size){
-		memoryBudget.expand(size);
-		long expandPages = size / pageSize;
-		totalNumberOfPages.addAndGet(expandPages);
+	public void expand(long pages){
+		//Expand managed memory first
+		memoryBudget.expand(pages * pages);
+		totalNumberOfPages.addAndGet(pages);
+
+		//Expand block cache
+		sharedResources.resize(totalNumberOfPages.get()* pageSize);
+	}
+
+	public void resize(long target){
+		long targetPages = target / pageSize;
+		if (targetPages > totalNumberOfPages.get()){
+			expand(targetPages - totalNumberOfPages.get());
+		} else if(targetPages < totalNumberOfPages.get()){
+			shrink(totalNumberOfPages.get() - targetPages);
+		}
 	}
 }

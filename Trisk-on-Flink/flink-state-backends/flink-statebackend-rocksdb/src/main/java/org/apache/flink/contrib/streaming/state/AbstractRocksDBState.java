@@ -283,7 +283,6 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		}
 
 		private void updateGetItemFrequency(Object userKey){
-			System.out.println("keyGroup: " + keyGroup + ", key: " + key + ", userKey: " +userKey);
 			itemFrequencyGauge.putItem(keyGroup, key, userKey);
 		}
 

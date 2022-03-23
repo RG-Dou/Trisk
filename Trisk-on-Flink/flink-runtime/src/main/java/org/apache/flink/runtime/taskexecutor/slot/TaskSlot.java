@@ -321,11 +321,6 @@ public class TaskSlot<T extends TaskSlotPayload> implements AutoCloseableAsync {
 	//Issue: vScaling
 	public void updateResource(ResourceProfile targetResource){
 		MemorySize targetManagedMemory = targetResource.getManagedMemory();
-		MemorySize currentManagedMemory = resourceProfile.getManagedMemory();
-		if (targetManagedMemory.compareTo(currentManagedMemory) < 0){
-			memoryManager.shrink(currentManagedMemory.subtract(targetManagedMemory).getBytes());
-		} else if(targetManagedMemory.compareTo(currentManagedMemory) > 0){
-			memoryManager.expand(targetManagedMemory.subtract(currentManagedMemory).getBytes());
-		}
+		memoryManager.resize(targetManagedMemory.getBytes());
 	}
 }

@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import static org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend.MERGE_OPERATOR_NAME;
@@ -195,17 +196,24 @@ public class RocksDBOperationUtils {
 		final LongFunctionWithException<RocksDBSharedResources, Exception> allocator = (size) ->
 			RocksDBMemoryControllerUtils.allocateRocksDBSharedResources(size, writeBufferRatio, highPriorityPoolRatio);
 
+		//Issue: vScaling
+		final BiConsumer<RocksDBSharedResources, Long> resizer = (RocksDBSharedResources::resizeCache);
 		try {
 			if (memoryConfig.isUsingFixedMemoryPerSlot()) {
 				assert memoryConfig.getFixedMemoryPerSlot() != null;
 
 				logger.info("Getting fixed-size shared cache for RocksDB.");
+				//Issue: vScaling
+//				return memoryManager.getExternalSharedMemoryResource(
+//						FIXED_SLOT_MEMORY_RESOURCE_ID, allocator, memoryConfig.getFixedMemoryPerSlot().getBytes());
 				return memoryManager.getExternalSharedMemoryResource(
-						FIXED_SLOT_MEMORY_RESOURCE_ID, allocator, memoryConfig.getFixedMemoryPerSlot().getBytes());
+					FIXED_SLOT_MEMORY_RESOURCE_ID, allocator, resizer, memoryConfig.getFixedMemoryPerSlot().getBytes());
 			}
 			else {
 				logger.info("Getting managed memory shared cache for RocksDB.");
-				return memoryManager.getSharedMemoryResourceForManagedMemory(MANAGED_MEMORY_RESOURCE_ID, allocator);
+				//Issue: vScaling
+//				return memoryManager.getSharedMemoryResourceForManagedMemory(MANAGED_MEMORY_RESOURCE_ID, allocator);
+				return memoryManager.getSharedMemoryResourceForManagedMemory(MANAGED_MEMORY_RESOURCE_ID, allocator, resizer);
 			}
 		}
 		catch (Exception e) {
