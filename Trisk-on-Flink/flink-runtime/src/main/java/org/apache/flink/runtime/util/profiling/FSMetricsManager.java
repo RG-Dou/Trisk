@@ -246,9 +246,9 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //						+ " observedOutputRate: " + observedOutputRate + ","
 //						+ " trueOutputRate: " + trueOutputRate + ","
 						+ " endToEndLantecy: " + endToEndLantecy + ","
-						+ " utilization: " + String.format("%.2f", utilization);
-//						+ " totalRecordsIn: " + totalRecordsIn + ","
-//						+ " totalRecordsOut: " + totalRecordsOut;
+						+ " utilization: " + String.format("%.2f", utilization) + ","
+						+ " totalRecordsIn: " + totalRecordsIn + ","
+						+ " totalRecordsOut: " + totalRecordsOut;
 
 					outputStreamDecorator.println(ratesLine);
 //					System.out.println("workername: " + getJobVertexId() + " epoch: " + epoch + " keygroups: " + status.inputKeyGroup.keySet());
@@ -410,7 +410,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 						+ workerName + "-" + instanceId + ","
 						+ " observedOutputRate: " + observedOutputRate + ","
 						+ " totalRecordsOut: " + totalRecordsOut + ","
-						+ " trueOutputRate: " + trueOutputRate;
+						+ " trueOutputRate: " + trueOutputRate + ","
+						+ totalRecordsOut;
 
 					outputStreamDecorator.println(ratesLine);
 
