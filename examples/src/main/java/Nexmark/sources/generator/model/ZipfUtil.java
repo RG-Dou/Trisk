@@ -6,6 +6,15 @@ import java.util.Random;
 
 public class ZipfUtil implements Serializable {
     private static Random rnd = new Random(0);
+
+    public Long getSize() {
+        return size;
+    }
+
+    public double getSkew() {
+        return skew;
+    }
+
     private final Long size;
     private final double skew;
 //    private final File file;

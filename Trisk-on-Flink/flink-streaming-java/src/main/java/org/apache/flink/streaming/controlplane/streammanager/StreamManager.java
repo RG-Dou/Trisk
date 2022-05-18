@@ -67,7 +67,7 @@ import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWi
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.udm.*;
-import org.apache.flink.util.ChildFirstClassLoader;
+import org.apache.flink.streaming.controlplane.udm.vscaling.VerticalScalingTest;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1321,7 +1321,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						failure.printStackTrace();
 					}
 					try {
-						System.out.println("the resource of slot " + slotID + " finished update");
+//						System.out.println("the resource of slot " + slotID + " finished update");
 						log.info("the resource of slot " + slotID + " finished update");
 						callback.callback(slotID);
 					} catch (Exception e) {

@@ -1,0 +1,186 @@
+#!/bin/bash
+ROOT="$(dirname $(dirname $(dirname $(pwd))))"
+FLINK_DIR="$ROOT/Trisk-on-Flink/build-target/"
+FLINK_APP_DIR="$ROOT/examples/"
+JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
+### ### ###  		   ### ### ###
+
+### ### ### INITIALIZATION ### ### ###
+
+### ### ###  		   ### ### ###
+
+init() {
+  # app level
+  LATENCY_DIR="/home/drg/projects/work3/flink/data/trisk/"
+  ### paths configuration ###
+  FLINK=$FLINK_DIR$"bin/flink"
+  readonly SAVEPOINT_PATH="/home/drg/projects/work3/temp/"
+  if [[ "$2" = "q3" ]]; then
+    JOB="Nexmark.queries.Query3Stateful"
+  elif [[ "$2" = "q3window" ]]; then
+    JOB="Nexmark.queries.Query3StatefulWindow"
+  elif [[ "$2" = "q5" ]]; then
+    JOB="Nexmark.queries.Query5Keyed"
+  elif [[ "$2" = "q8" ]]; then
+    JOB="Nexmark.queries.Query8Keyed"
+  elif [[ "$2" = "q20" ]]; then
+    JOB="Nexmark.queries.Query20"
+  elif [[ "$2" = "q4" ]]; then
+    JOB="Nexmark.queries.Query4"
+  fi
+  EXP_NAME="nexmark-$2"
+
+#  partitions=128
+#  parallelism=1
+  AUCTION_S=2000
+  PERSON_S=300
+  BID_S=6000
+  STATE_SIZE=60000
+  KEY_SIZE=100000
+  AUCTION_P=1
+  PERSON_P=1
+  BID_P=1
+  JOIN_P=4
+  runtime=700
+  blockCacheSize=$1
+  simpleTest=$3
+  ROCKSDB_DIR="/home/drg/projects/work3/flink/rocksdb-storage"
+  ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
+  ROCKSDB_CHECKPOINT=${ROCKSDB_DIR}"/checkpoint/"
+  ROCKSDB_DATA="/home/drg/projects/work3/flink/rocksdb-storage/localdir/"
+  rm -rf ${ROCKSDB_DATA}*
+  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}"
+#  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/queue_delay"
+#  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/state_size/${readCount}"
+  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
+  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+}
+
+# config block cache size
+function configApp() {
+    echo "INFO: config app block cache size: ${blockCacheSize}m"
+#    sed -ri "s|(state.backend.rocksdb.block.cache-size: )[0-9]*|state.backend.rocksdb.block.cache-size: $blockCacheSize|" ${FLINK_DIR}conf/flink-conf.yaml
+#    sed -ri "s|(taskmanager.memory.managed.fraction: 0.)[0-9]*|taskmanager.memory.managed.fraction: 0.$blockCacheSize|" ${FLINK_DIR}conf/flink-conf.yaml
+    sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $blockCacheSize|" ${FLINK_DIR}conf/flink-conf.yaml
+    sed -i "s/^\(trisk.simple_test: \)\(true\|false\)/\1${simpleTest}/"  ${FLINK_DIR}conf/flink-conf.yaml
+
+}
+
+function mvRocksdbLog() {
+    if [[ ! -d ${DATA_DIR} ]]; then
+            mkdir ${DATA_DIR}
+    fi
+    mkdir ${DATA_DIR}/${blockCacheSize}
+    if [[ -d ${DATA_DIR}/${blockCacheSize}/${simpleTest} ]]; then
+            # shellcheck disable=SC2115
+            rm -rf ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+    fi
+    mkdir ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+    mv ${ROCKSDB_LOG_DIR}* ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+#    for entry in ${ROCKSDB_LOG_DIR}*
+#    do
+#      echo "$entry"
+#    done
+    echo "INFO: move rocksdb Log"
+
+}
+
+# run flink clsuter
+function runFlink() {
+    echo "INFO: starting the cluster"
+    if [[ -d ${FLINK_DIR}log ]]; then
+        rm -rf ${FLINK_DIR}log
+    fi
+    mkdir ${FLINK_DIR}log
+    ${FLINK_DIR}/bin/start-cluster.sh
+}
+
+# clean app specific related data
+function cleanEnv() {
+  mvRocksdbLog
+#  if [[ -d ${FLINK_DIR}${EXP_NAME} ]]; then
+#      rm -rf ${FLINK_DIR}${EXP_NAME}
+#  fi
+#  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+  rm -rf /tmp/flink*
+  rm ${FLINK_DIR}log/*
+}
+
+function cleanRocksdbLog() {
+    rm -rf ${ROCKSDB_LOG_DIR}*
+    rm -rf ${ROCKSDB_CHECKPOINT}*
+}
+
+# clsoe flink clsuter
+function stopFlink() {
+    echo "INFO: experiment finished, stopping the cluster"
+    PID=`jps | grep CliFrontend | awk '{print $1}'`
+    if [[ ! -z $PID ]]; then
+      kill -9 ${PID}
+    fi
+    PID=`jps | grep StockGenerator | awk '{print $1}'`
+    if [[ ! -z $PID ]]; then
+      kill -9 ${PID}
+    fi
+    ${FLINK_DIR}bin/stop-cluster.sh
+    echo "close finished"
+    cleanEnv
+}
+
+
+# run applications
+function runApp() {
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} &"
+  rm nohup.out
+  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} &
+}
+
+function runGenerator() {
+  echo "INFO: java -cp ${FLINK_APP_DIR}target/testbed-1.0-SNAPSHOT.jar kafkagenerator.StockGenerator > /dev/null 2>&1 &"
+  java -cp ${FLINK_APP_DIR}target/testbed-1.0-SNAPSHOT.jar kafkagenerator.StockGenerator > /dev/null 2>&1 &
+}
+
+# run applications
+function reconfigApp() {
+  JOB_ID=$(cat nohup.out | sed -n '1p' | rev | cut -d' ' -f 1 | rev)
+  JOB_ID=$(echo $JOB_ID |tr -d '\n')
+  echo "INFO: running job: $JOB_ID"
+
+  savepointPathStr=$($FLINK cancel -s $SAVEPOINT_PATH $JOB_ID)
+  savepointFile=$(echo $savepointPathStr| rev | cut -d'/' -f 1 | rev)
+  x=$(echo $savepointFile |tr -d '.')
+  x=$(echo $x |tr -d '\n')
+
+  rm nohup.out
+  echo "INFO: RECOVER $FLINK run -d -s $SAVEPOINT_PATH$x -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-join ${JOIN_P} &"
+  nohup $FLINK run -d -s $SAVEPOINT_PATH$x --class $JOB $JAR  -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-join ${JOIN_P} &
+}
+
+# run one flink demo exp, which is a word count job
+run_one_exp() {
+  configApp
+
+  # compute n_tuples from per task rates and parallelism
+  echo "INFO: run exp Nexmark exchange"
+#  configFlink
+  cleanRocksdbLog
+  runFlink
+  python3 -c 'import time; time.sleep(5)'
+
+  runApp
+
+  SCRIPTS_RUNTIME=`expr ${runtime} - 50 + 10`
+  python3 -c 'import time; time.sleep('"${SCRIPTS_RUNTIME}"')'
+  stopFlink
+}
+
+test() {
+#  configApp
+  mvRocksdbLog
+}
+
+init $1 $2 $3
+run_one_exp
+#test

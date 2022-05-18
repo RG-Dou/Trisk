@@ -22,13 +22,10 @@ import Nexmark.sources.generator.model.PersonGeneratorZipf;
 import org.apache.beam.sdk.nexmark.NexmarkConfiguration;
 import org.apache.beam.sdk.nexmark.model.Person;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
-import org.apache.beam.sdk.nexmark.sources.generator.model.PersonGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 import org.joda.time.DateTime;
 
 import java.util.Random;
-
-;
 
 /**
  * A ParallelSourceFunction that generates Nexmark Person data
@@ -37,21 +34,22 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
 
     private volatile boolean running = true;
 //    private final GeneratorConfig config = new GeneratorConfig(NexmarkConfiguration.DEFAULT, 1, 1000L, 0, 1);
-    private final GeneratorConfig config;
+    private GeneratorConfig config;
     private long eventsCountSoFar = 0;
     private int rate;
     private int cycle = 60;
     private int base = 0;
     private int warmUpInterval = 60000;
     private int densityId = 25;
-    private final PersonGeneratorZipf generatorZipf = new PersonGeneratorZipf(10000, 0.6);
+    private PersonGeneratorZipf generatorZipf = new PersonGeneratorZipf(2000, 1.0);
 
     public PersonSourceFunction(int srcRate, int cycle) {
-        this(srcRate, cycle, 0);
+//        this(srcRate, cycle, 0);
+        this(0, cycle, srcRate);
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base) {
-        this(srcRate, cycle, base, 20000);
+        this(srcRate, cycle, base, 25000);
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {
@@ -66,7 +64,15 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
 
     public PersonSourceFunction(int srcRate) {
         this(srcRate, 60);
-//        this.rate = srcRate;
+    }
+
+    public PersonSourceFunction(int srcRate, long stateSize) {
+        this(srcRate, 60);
+        NexmarkConfiguration nexConfig = NexmarkConfiguration.DEFAULT;
+        nexConfig.avgPersonByteSize = (int) stateSize;
+        config = new GeneratorConfig(nexConfig, 1, 1000L, 0, 1);
+//        long size = 1000000000 / stateSize;
+//        generatorZipf = new PersonGeneratorZipf(size, 0.6);
     }
 
     @Override

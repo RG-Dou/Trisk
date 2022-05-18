@@ -33,10 +33,10 @@ public class StatisticConfigurableOptionsFactory extends DefaultConfigurableOpti
         statistics.setStatsLevel(StatsLevel.ALL);
         currentOptions.setStatistics(statistics);
         currentOptions.setInfoLogLevel(InfoLogLevel.INFO_LEVEL);
-        currentOptions.setStatsDumpPeriodSec(30);
+        currentOptions.setStatsDumpPeriodSec(5);
         currentOptions.setDbLogDir(dbLogDir);
-        DumpStat dumpStat = new DumpStat(statistics);
-        dumpStat.start();
+//        DumpStat dumpStat = new DumpStat(statistics);
+//        dumpStat.start();
 
         return currentOptions;
     }

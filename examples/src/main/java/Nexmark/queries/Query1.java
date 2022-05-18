@@ -54,7 +54,8 @@ public class Query1 {
         final int srcBase = params.getInt("srcBase", 0);
         final int srcWarmUp = params.getInt("srcWarmUp", 100);
 
-        DataStream<Bid> bids = env.addSource(new BidSourceFunction(srcRate, srcCycle, srcBase, srcWarmUp*1000))
+//        DataStream<Bid> bids = env.addSource(new BidSourceFunction(srcRate, srcBase, srcCycle, srcWarmUp*1000))
+        DataStream<Bid> bids = env.addSource(new BidSourceFunction(srcRate))
                 .setParallelism(params.getInt("p-source", 1))
                 .name("Bids Source")
                 .uid("Bids-Source");
@@ -62,6 +63,8 @@ public class Query1 {
         DataStream<Tuple4<Long, Long, Long, Long>> mapped  = bids.map(new MapFunction<Bid, Tuple4<Long, Long, Long, Long>>() {
             @Override
             public Tuple4<Long, Long, Long, Long> map(Bid bid) throws Exception {
+                long start = System.nanoTime();
+                while (System.nanoTime() - start < 1_000_000) {}
                 return new Tuple4<>(bid.auction, dollarToEuro(bid.price, exchangeRate), bid.bidder, bid.dateTime);
             }
         }).setMaxParallelism(params.getInt("mp2", 64))
@@ -77,7 +80,7 @@ public class Query1 {
         .uid("Latency-Sink");
 
         // execute program
-        env.execute("Nexmark Query1");
+        env.execute("Nexmark Query");
     }
 
     private static long dollarToEuro(long dollarPrice, float rate) {

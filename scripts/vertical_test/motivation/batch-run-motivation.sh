@@ -1,10 +1,7 @@
 #!/bin/bash
 
-for BlockCache in 05; do
-#     for BlockCache in 03 80; do
-#    bash nexmark-run.sh ${BlockCache} q3window
-    bash nexmark-run.sh ${BlockCache} q20
-done
+bash nexmark-run.sh 1000 q20 true
+bash nexmark-run.sh 1000 q20 false
 
 # for StateSize in 300000; do
 #     for BlockCache in 03; do

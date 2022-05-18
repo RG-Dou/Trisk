@@ -20,6 +20,7 @@ package Nexmark.sinks;
 
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.operators.StreamSink;
+import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.slf4j.Logger;
@@ -28,11 +29,11 @@ import org.slf4j.Logger;
 /**
  * A Sink that drops all data and periodically emits latency measurements
  */
-public class DummyLatencyCountingSink<T> extends StreamSink<T> {
+public class DummyLatencyCountingSinkOutput<T> extends StreamSink<T> {
 
     private final Logger logger;
 
-    public DummyLatencyCountingSink(Logger log) {
+    public DummyLatencyCountingSinkOutput(Logger log) {
         super(new SinkFunction<T>() {
 
             @Override
@@ -40,6 +41,19 @@ public class DummyLatencyCountingSink<T> extends StreamSink<T> {
         });
         logger = log;
     }
+
+    @Override
+    public void processElement(StreamRecord<T> element) throws Exception {
+        long now = System.currentTimeMillis();
+        System.out.println("ts:"+now+ " endToEnd:" + (now - element.getTimestamp()));
+    }
+
+//    @Override
+//    public void processWatermark(Watermark mark) throws Exception {
+//        long now = System.currentTimeMillis();
+//        System.out.println("ts:"+now+ " endToEnd:" + (now - mark.getTimestamp()));
+//        super.processWatermark(mark);
+//    }
 
     @Override
     public void processLatencyMarker(LatencyMarker latencyMarker) throws Exception {

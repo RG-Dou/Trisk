@@ -3,13 +3,15 @@ package org.apache.flink.streaming.controlplane.rescale.metrics;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
-import scala.concurrent.java8.FuturesConvertersImpl;
+import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.OperatorMetrics;
+import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.TaskMetrics;
+import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.VScalingMetrics;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,6 +20,7 @@ public class RestfulMetricsRetriever {
 
 	final private String rootAddress;
 	final private String jobName;
+	final private String rocksdbLogDir;
 
 	final private String JOBS = "/jobs";
 	final private String VERTICES = "/vertices";
@@ -26,34 +29,17 @@ public class RestfulMetricsRetriever {
 	final private String OVERVIEW = "/overview";
 	final private String METRICS = "/metrics";
 	final private String PLAN = "/plan";
-	final private int retry = 6;
+	final private int retry = 100;
 
 	private String jid;
 
-	final private Map<String, String> verticesName;
-	final private Map<String, Integer> verticesSubTasks;
-	final private Map<String, Map<Integer, Map<String, String>>> states;
-	final private Map<String, Map<Integer, Map<String, Double>>> statesAccessTime;
-	final private Map<String, Map<Integer, Map<String, ArrayList<Long>>>> statesItemFrequency;
-	final private Map<String, Map<Integer, Map<String, Tuple2<Double, Long>>>> statesAvgStateSize;
-	final private Map<String, Map<Integer, Double>> serviceTime;
-	final private Map<String, Map<Integer, Double>> queuingTime;
-	final private Map<String, Map<Integer, Double>> tupleLatency;
-	final private Map<String, Map<Integer, Long>> numRecordsIn;
+	private final VScalingMetrics metrics;
 
-	public RestfulMetricsRetriever(String ip, int port, String jobName){
+	public RestfulMetricsRetriever(String ip, int port, String jobName, VScalingMetrics metrics, String rocksdbLogDir){
 		rootAddress = "http://" + ip + ":" + port + "/v1";
 		this.jobName = jobName;
-		this.verticesName = new HashMap<>();
-		this.verticesSubTasks = new HashMap<>();
-		this.states = new HashMap<>();
-		this.statesAccessTime = new HashMap<>();
-		this.statesItemFrequency = new HashMap<>();
-		this.statesAvgStateSize = new HashMap<>();
-		this.serviceTime = new HashMap<>();
-		this.queuingTime = new HashMap<>();
-		this.tupleLatency = new HashMap<>();
-		this.numRecordsIn = new HashMap<>();
+		this.metrics = metrics;
+		this.rocksdbLogDir = rocksdbLogDir;
 	}
 
 	public void init(){
@@ -64,8 +50,8 @@ public class RestfulMetricsRetriever {
 				tries++;
 				Thread.sleep(1000);
 			}
-			while(tries < retry && verticesName.size() == 0){
-				initVertices();
+			while(tries < retry && metrics.getFullNumOperator() == 0){
+				initOperators();
 				tries++;
 				Thread.sleep(1000);
 			}
@@ -76,7 +62,6 @@ public class RestfulMetricsRetriever {
 			if (tries >= retry){
 				System.out.println("exceed the maximum retries time!");
 			}
-			System.out.println(states);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -94,151 +79,219 @@ public class RestfulMetricsRetriever {
 		}
 	}
 
-	private void initVertices(){
+	private void initOperators(){
 		String address = rootAddress + JOBS + "/" + jid + PLAN;
 		JSONObject response = getMetricsJson(address);
 		List<JSONObject> nodes = filterJsonArray(response.getJSONObject("plan").getJSONArray("nodes"));
 		for(JSONObject node : nodes){
 			String id = node.getString("id");
-			verticesName.put(id, node.getString("description"));
-			verticesSubTasks.put(id, node.getInteger("parallelism"));
+
+			metrics.addOperator(id, node.getString("description"));
+			metrics.setNumTask(id, node.getInteger("parallelism"));
+			System.out.println("Operator Name: "+ node.getString("description") + ", Operator ID: " + id + ", NumTask: " + node.getInteger("parallelism"));
 		}
 	}
 
 	private boolean initMetrics(){
-		for(Map.Entry<String, Integer> entry : verticesSubTasks.entrySet()){
-			Map<Integer, Map<String, String>> verticesStates = new HashMap<>();
-			String vertices = entry.getKey();
+		for(String operatorId : metrics.getOperatorFullList()){
+			int taskIndex = 0;
 
-			for(int i = 0; i < entry.getValue(); i ++){
-				Map<String, String> subTaskStates = new HashMap<>();
+			String address = rootAddress + JOBS + "/" + jid + VERTICES + "/" + operatorId + SUBTASKS + "/" + taskIndex + METRICS;
+			String response = getMetrics(address);
+			List<JSONObject> metrics = JSON.parseArray(response,JSONObject.class);
 
-				String address = rootAddress + JOBS + "/" + jid + VERTICES + "/" + vertices + SUBTASKS + "/" + i + METRICS;
-				System.out.println(address);
-				String response = getMetrics(address);
-				List<JSONObject> metrics = JSON.parseArray(response,JSONObject.class);
-
-				if(metrics.size() <= 0){
-					return false;
-				}
-				for(JSONObject metric : metrics){
-					String metricID = metric.getString("id");
-					String[] metricIDFilter = metricID.split("\\.");
-					if(metricIDFilter.length >= 4 && metricIDFilter[1].equals("state_name")){
-						String stateName = metricIDFilter[2];
-						String stateType = null;
-						if(metricIDFilter[3].contains("mapState"))
-							stateType = "mapStateCacheAccessLatency";
-						else if(metricIDFilter[3].contains("aggregatingState"))
-							stateType = "aggregatingStateGetLatency";
-						else if(metricIDFilter[3].contains("reducingState"))
-							stateType = "reducingStateGetLatency";
-						else if(metricIDFilter[3].contains("listState"))
-							stateType = "listStateGetLatency";
-						else if(metricIDFilter[3].contains("valueState"))
-							stateType = "valueStateGetLatency";
-						if(stateType != null)
-							subTaskStates.put(stateName, stateType);
+			if(metrics.size() <= 0){
+				return false;
+			}
+			for(JSONObject metric : metrics){
+				String metricID = metric.getString("id");
+				String[] metricIDFilter = metricID.split("\\.");
+				if(metricIDFilter.length >= 4 && metricIDFilter[1].equals("state_name")){
+					String stateName = metricIDFilter[2];
+					String stateType = null;
+					if(metricIDFilter[3].contains("mapStateCacheAccessLatency"))
+						stateType = "mapStateCacheAccessLatency";
+					else if(metricIDFilter[3].contains("aggregatingStateGetLatency"))
+						stateType = "aggregatingStateGetLatency";
+					else if(metricIDFilter[3].contains("reducingStateGetLatency"))
+						stateType = "reducingStateGetLatency";
+					else if(metricIDFilter[3].contains("listStateGetLatency"))
+						stateType = "listStateGetLatency";
+					else if(metricIDFilter[3].contains("valueStateGetLatency"))
+						stateType = "valueStateGetLatency";
+					if(stateType != null) {
+						this.metrics.setStateName(operatorId, stateName);
+						this.metrics.setStateAccessTimeTag(operatorId, stateName, stateType);
 					}
 				}
-				verticesStates.put(i, subTaskStates);
 			}
-			states.put(vertices, verticesStates);
 		}
-		System.out.println("states: " + states);
 		return true;
 	}
 
-	public void updateMetrics(){
-		updateSubTaskMetrics();
-//		update
-	}
-
-	private void updateSubTaskMetrics(){
-		statesAccessTime.clear();
-		serviceTime.clear();
-		queuingTime.clear();
-		tupleLatency.clear();
-		statesItemFrequency.clear();
-		statesAvgStateSize.clear();
-		numRecordsIn.clear();
-		for(Map.Entry<String, Map<Integer, Map<String, String>>> entry : states.entrySet()){
-			Map<Integer, Map<String, Double>> verticesSATime = new HashMap<>();
-			Map<Integer, Double> verticesServiceTime = new HashMap<>();
-			Map<Integer, Double> verticesQueuingTime = new HashMap<>();
-			Map<Integer, Double> verticesTupleLatency = new HashMap<>();
-			Map<Integer, Long> verticesNumRecordsIn = new HashMap<>();
-			Map<Integer, Map<String, ArrayList<Long>>> verticesItemFreq = new HashMap<>();
-			Map<Integer, Map<String, Tuple2<Double, Long>>> verticesStateSize = new HashMap<>();
-
-			String vertices = entry.getKey();
-			for(Map.Entry<Integer, Map<String, String>> entry2 : entry.getValue().entrySet()){
-				Integer subTaskIndex = entry2.getKey();
-
-				Map<String, Double> subTaskSATime = new HashMap<>();
-				Map<String, ArrayList<Long>> subTaskItemFreq = new HashMap<>();
-				Map<String, Tuple2<Double, Long>> subTaskStateSize = new HashMap<>();
-
-				if(entry2.getValue().size() == 0)
+	public void collectMetrics(){
+		for(String operatorId : metrics.getOperatorList()){
+			Integer tasks = metrics.getNumTask(operatorId);
+			String operatorName = metrics.getOperator(operatorId).getOperatorName();
+			ArrayList<String> states = metrics.getOperatorState(operatorId);
+			for (int subTaskIndex = 0; subTaskIndex < tasks; subTaskIndex ++){
+				if(states == null || states.size() == 0)
 					break;
 
-				for(Map.Entry<String, String> entry3 : entry2.getValue().entrySet()){
-					String stateName = entry3.getKey();
-					String stateType = entry3.getValue();
-
+				for (String stateName : states){
 					// 1. get state access time
-					String metricsIDSATime = verticesName.get(vertices).replace(" ", "_") + ".state_name." + stateName + "." + stateType + "_mean";
-					subTaskSATime.put(stateName, getSubTaskDoubleMetrics(vertices, subTaskIndex, metricsIDSATime) / 1000000.0);
-
-					// 2. get item frequency
-					String metricsIDIF = verticesName.get(vertices).replace(" ", "_") + ".state_name." + stateName + "." + "itemFrequency";
-					subTaskItemFreq.put(stateName, getSubTaskListMetrics(vertices, subTaskIndex, metricsIDIF));
-
-					// 3. get average state size
-					String metricsIDASS = verticesName.get(vertices).replace(" ", "_") + ".state_name." + stateName + "." + "stateSize";
-					subTaskStateSize.put(stateName, getSubTaskDTuple2Metrics(vertices, subTaskIndex, metricsIDASS));
+					String tag = this.metrics.getStateAccessTimeTag(operatorId, stateName);
+					String metricsIDSATime = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + tag + "_mean";
+					metrics.setAccessTime(operatorId, subTaskIndex, stateName, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsIDSATime) / 1000000.0);
 				}
 
-				verticesSATime.put(subTaskIndex, subTaskSATime);
-				verticesItemFreq.put(subTaskIndex, subTaskItemFreq);
-				verticesStateSize.put(subTaskIndex, subTaskStateSize);
-
-				// 4. get service time
-				String metricsID = "serviceTime";
-				verticesServiceTime.put(subTaskIndex, getSubTaskDoubleMetrics(vertices, subTaskIndex, metricsID));
-
-				// 5. get queuing time
-				metricsID = "queuingTime";
-				verticesQueuingTime.put(subTaskIndex, getSubTaskDoubleMetrics(vertices, subTaskIndex, metricsID));
-
-				// 6. get tuple latency
-				metricsID = "tupleLatency";
-				verticesTupleLatency.put(subTaskIndex, getSubTaskDoubleMetrics(vertices, subTaskIndex, metricsID));
-
-				// 7. get number of records in
-				metricsID = "numRecordsIn";
-				verticesNumRecordsIn.put(subTaskIndex, getSubTaskLongMetrics(vertices, subTaskIndex, metricsID));
+				// 2. get tuple latency
+				String metricsID = "tupleLatency";
+				metrics.setTupleLatency(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID));
 			}
-
-			if (verticesSATime.size() > 0) statesAccessTime.put(vertices, verticesSATime);
-			if (verticesServiceTime.size() > 0) serviceTime.put(vertices, verticesServiceTime);
-			if (verticesQueuingTime.size() > 0) queuingTime.put(vertices, verticesQueuingTime);
-			if (verticesTupleLatency.size() > 0) tupleLatency.put(vertices, verticesTupleLatency);
-			if (verticesItemFreq.size() > 0) statesItemFrequency.put(vertices, verticesItemFreq);
-			if (verticesStateSize.size() > 0) statesAvgStateSize.put(vertices, verticesStateSize);
-			if (verticesNumRecordsIn.size() > 0) numRecordsIn.put(vertices, verticesNumRecordsIn);
 		}
-//		System.out.println("state access delay: " + statesAccessTime);
-//		System.out.println("service time: " + serviceTime);
-//		System.out.println("queuing time: " + queuingTime);
-//		System.out.println("tuple latency: " + tupleLatency);
-		System.out.println("state item frequency: " + statesItemFrequency);
-//		System.out.println("state average state size: " + statesAvgStateSize);
-//		System.out.println("number of records in: " + numRecordsIn);
+
+		// all operators metrics
+		for (String operatorID: metrics.getOperatorFullList()){
+			OperatorMetrics operator = metrics.getOperator(operatorID);
+			int tasks = operator.getNumTasks();
+			for (int subTaskIndex = 0; subTaskIndex < tasks; subTaskIndex ++){
+				// Checkpoint Alignment Time
+				String metricsID = "checkpointAlignmentTime";
+				metrics.setAlignmentTime(operatorID, subTaskIndex, getSubTaskLongMetrics(operatorID, subTaskIndex, metricsID));
+
+				metricsID = "numRecordsIn";
+				Long recordsIn = getSubTaskLongMetrics(operatorID, subTaskIndex, metricsID);
+				if (recordsIn == null)
+					recordsIn = 0L;
+				metrics.setNumRecordsIn(operatorID, subTaskIndex, recordsIn);
+
+				metricsID = "numRecordsOut";
+				Long recordsOut = getSubTaskLongMetrics(operatorID, subTaskIndex, metricsID);
+				if (recordsOut == null)
+					recordsOut = 0L;
+				metrics.setNumRecordsOut(operatorID, subTaskIndex, recordsOut);
+
+
+				// end-to-end latency
+//				metricsID = "latency.operator_id." + operatorID + ".operator_subtask_index." + subTaskIndex + ".latency_mean";
+//				metrics.setEndToEndLatency(operatorID, subTaskIndex, getJobDoubleMetrics(metricsID));
+			}
+		}
 	}
 
-	private Tuple2<Double, Long> getSubTaskDTuple2Metrics(String vertices, int subTaskIndex, String metrics){
-		String address = combineMetricsURL(vertices, subTaskIndex, metrics);
+	public void updateMetrics(){
+		metrics.incEpoch();
+		collectOtherMetrics();
+		collectRocksdbStats();
+		metrics.preprocess();
+//		for(String operatorId:metrics.getOperatorList()){
+//			System.out.println(metrics.getOperator(operatorId).toSting());
+//		}
+	}
+
+	//ToDo: some metrics should be cleared after one scheduling.
+	private void collectOtherMetrics(){
+
+		// stateful metrics
+		for(String operatorId : metrics.getOperatorList()){
+			Integer tasks = metrics.getNumTask(operatorId);
+			String operatorName = metrics.getOperator(operatorId).getOperatorName();
+			ArrayList<String> states = metrics.getOperatorState(operatorId);
+			for (int subTaskIndex = 0; subTaskIndex < tasks; subTaskIndex ++){
+				if(states == null || states.size() == 0)
+					break;
+
+				for (String stateName : states){
+					// 1. get average state size
+					String metricsIDASS = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "stateSize";
+					Tuple2<Double, Long> tuple2 = getSubTaskDTuple2Metrics(operatorId, subTaskIndex, metricsIDASS);
+					metrics.setStateSizesCounter(operatorId, subTaskIndex, stateName, tuple2.f1);
+					metrics.setStateSizesState(operatorId, subTaskIndex, stateName, tuple2.f0);
+
+					// 2. get item frequency
+					String metricsIDIF = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "itemFrequency";
+					metrics.setItemFrequency(operatorId, subTaskIndex, stateName, getSubTaskListMetrics(operatorId, subTaskIndex, metricsIDIF));
+
+
+					// 3. get state access time
+					String tag = this.metrics.getStateAccessTimeTag(operatorId, stateName);
+					String metricsIDSATime = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + tag + "_mean";
+					metrics.setAccessTime(operatorId, subTaskIndex, stateName, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsIDSATime) / 1000000.0);
+				}
+
+				// 4. get tuple latency
+				String metricsID = "tupleLatency";
+				metrics.setTupleLatency(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID));
+
+				// 5. get number of records in
+				metricsID = "numRecordsIn";
+				metrics.setNumRecordsIn(operatorId, subTaskIndex, getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID));
+			}
+		}
+	}
+
+	public void collectRocksdbStats(){
+		for(String operatorID : metrics.getOperatorList()){
+			OperatorMetrics operator = metrics.getOperator(operatorID);
+			int numTasks = operator.getNumTasks();
+			for (int taskIndex = 0; taskIndex < numTasks; taskIndex ++){
+				TaskMetrics task = operator.getTaskMetrics(taskIndex);
+				String fileName = getRocksdbFile(operatorID, task);
+				if(fileName == null){
+					System.out.println("Fail to fetch rocksdb file");
+				} else {
+					Tuple2<Long, Long> cacheHitMiss = getCacheHitMiss(fileName);
+					task.setCacheHitMiss(cacheHitMiss.f0, cacheHitMiss.f1);
+				}
+ 			}
+		}
+	}
+
+	private String getRocksdbFile(String operatorID, TaskMetrics task){
+		if (task.getRocksdbLogFileName() != null)
+			return task.getRocksdbLogFileName();
+
+		int taskIndex = task.getIndex() + 1;
+		File file = new File(rocksdbLogDir);
+		File[] fs = file.listFiles();
+		assert fs != null;
+		for(File f : fs){
+			String name = f.getName();
+			if(name.contains(jid) && name.contains(operatorID + "__" + taskIndex)){
+				task.setRocksdbLogFileName(name);
+				return name;
+			}
+		}
+		return null;
+	}
+
+	private Tuple2<Long, Long> getCacheHitMiss(String fileName){
+		File file = new File(rocksdbLogDir+fileName);
+		long hit = 0;
+		long miss = 0;
+		try{
+			BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));
+			String s = null;
+			while((s = br.readLine())!=null){
+				if (s.contains("rocksdb.block.cache.data.hit")){
+					hit = Long.parseLong(s.split(" : ")[1]);
+				}
+				if (s.contains("rocksdb.block.cache.data.miss")){
+					miss = Long.parseLong(s.split(" : ")[1]);
+				}
+			}
+			br.close();
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+		return new Tuple2<>(hit, miss);
+	}
+
+
+
+	private Tuple2<Double, Long> getSubTaskDTuple2Metrics(String operatorId, int subTaskIndex, String metrics){
+		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
 		Tuple2<Double, Long> tuple2 = new Tuple2<>();
 		for (JSONObject item : response) {
@@ -255,8 +308,8 @@ public class RestfulMetricsRetriever {
 		return tuple2;
 	}
 
-	private ArrayList<Long> getSubTaskListMetrics(String vertices, int subTaskIndex, String metrics){
-		String address = combineMetricsURL(vertices, subTaskIndex, metrics);
+	private ArrayList<Long> getSubTaskListMetrics(String operatorId, int subTaskIndex, String metrics){
+		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
 		ArrayList<Long> list = new ArrayList<>();
 		for (JSONObject item : response){
@@ -274,8 +327,8 @@ public class RestfulMetricsRetriever {
 		return list;
 	}
 
-	private Double getSubTaskDoubleMetrics(String vertices, int subTaskIndex, String metrics){
-		String address = combineMetricsURL(vertices, subTaskIndex, metrics);
+	private Double getSubTaskDoubleMetrics(String operatorId, int subTaskIndex, String metrics){
+		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
 		Double value = 0.0;
 		for(JSONObject item : response){
@@ -284,8 +337,8 @@ public class RestfulMetricsRetriever {
 		return value;
 	}
 
-	private Long getSubTaskLongMetrics(String vertices, int subTaskIndex, String metrics){
-		String address = combineMetricsURL(vertices, subTaskIndex, metrics);
+	private Long getSubTaskLongMetrics(String operatorId, int subTaskIndex, String metrics){
+		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
 		long value = 0L;
 		for(JSONObject item : response){
@@ -294,9 +347,23 @@ public class RestfulMetricsRetriever {
 		return value;
 	}
 
-	private String combineMetricsURL(String vertices, int subTaskIndex, String metrics){
+	private Double getJobDoubleMetrics(String metrics){
+		String address = combineJobMetricsURL(metrics);
+		List<JSONObject> response = getMetricsJsonArray(address);
+		Double value = 0.0;
+		for(JSONObject item : response){
+			value = item.getDouble("value");
+		}
+		return value;
+	}
+
+	private String combineMetricsURL(String operatorId, int subTaskIndex, String metrics){
 		return rootAddress + JOBS + "/" + jid + VERTICES +
-			"/" + vertices + SUBTASKS + "/" + subTaskIndex + METRICS + "?get=" + metrics;
+			"/" + operatorId + SUBTASKS + "/" + subTaskIndex + METRICS + "?get=" + metrics;
+	}
+
+	private String combineJobMetricsURL(String metrics){
+		return rootAddress + JOBS + "/" + jid  + METRICS + "?get=" + metrics;
 	}
 
 	private List<JSONObject> filterJsonArray(JSONArray object){
@@ -330,7 +397,6 @@ public class RestfulMetricsRetriever {
 				System.out.println("Return code is: " + code);
 			}
 			connection.disconnect();
-//			System.out.println("metrics retriever restful: " + msg);
 
 		} catch (IOException e){
 			e.printStackTrace();

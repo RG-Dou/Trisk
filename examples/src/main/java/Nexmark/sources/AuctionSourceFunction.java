@@ -25,6 +25,7 @@ import org.apache.beam.sdk.nexmark.model.Person;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
 import org.apache.beam.sdk.nexmark.sources.generator.model.AuctionGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.joda.time.DateTime;
 
 import java.util.Random;
 
@@ -35,35 +36,54 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     private volatile boolean running = true;
 //    private final GeneratorConfig config = new GeneratorConfig(NexmarkConfiguration.DEFAULT, 1, 1000L, 0, 1);
-    private final GeneratorConfig config;
+    private GeneratorConfig config;
     private long eventsCountSoFar = 0;
     private int rate;
     private int cycle = 60;
     private int base = 0;
     private int warmUpInterval = 60000;
     private int densityId = 25;
-    private final AuctionGeneratorZipf generatorZipf = new AuctionGeneratorZipf(10000, 0.6);
+    private AuctionGeneratorZipf generatorZipf;
 
-    public AuctionSourceFunction(int srcRate, int cycle) {
-        this(srcRate, cycle, 0);
+    public AuctionSourceFunction(int srcRate) {
+        this(srcRate, 0);
     }
 
-    public AuctionSourceFunction(int srcRate, int cycle, int base) {
-        this(srcRate, cycle, base, 20000);
+    public AuctionSourceFunction(int srcRate, int base) {
+        this(srcRate, base, 60);
     }
 
-    public AuctionSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {
+    public AuctionSourceFunction(int srcBase, long stateSize){
+        this(0, srcBase, 60);
+        NexmarkConfiguration nexConfig = NexmarkConfiguration.DEFAULT;
+        nexConfig.avgAuctionByteSize = (int) stateSize;
+        config = new GeneratorConfig(nexConfig, 1, 1000L, 0, 1);
+//        long size = 1000000000 / stateSize;
+//        generatorZipf = new AuctionGeneratorZipf(size, 0.6);
+    }
+
+    public AuctionSourceFunction(int base, long stateSize, long keys){
+        this(0, base, 60, 400000, stateSize, keys);
+    }
+
+
+    public AuctionSourceFunction(int srcRate, int base, int cycle) {
+        this(srcRate, base, cycle, 40000);
+    }
+
+    public AuctionSourceFunction(int srcRate, int base, int cycle, int warmUpInterval) {
+        this(srcRate, base, cycle, warmUpInterval, 1000, 100000);
+    }
+
+    public AuctionSourceFunction(int srcRate, int base, int cycle, int warmUpInterval, long stateSize, long keys) {
         this.rate = srcRate;
         this.cycle = cycle;
         this.base = base;
         this.warmUpInterval = warmUpInterval;
         NexmarkConfiguration nexConfig = NexmarkConfiguration.DEFAULT;
-        nexConfig.avgAuctionByteSize = 0;
+        nexConfig.avgAuctionByteSize = (int) stateSize;
         config = new GeneratorConfig(nexConfig, 1, 1000L, 0, 1);
-    }
-
-    public AuctionSourceFunction(int srcRate) {
-        this(srcRate, 60);
+        generatorZipf = new AuctionGeneratorZipf(stateSize, 1.0, keys);
     }
 
     @Override
@@ -77,6 +97,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         // warm up
         Thread.sleep(30000);
         warmup(ctx);
+        base = 0;
 
         while (running) {
             long emitStartTime = System.currentTimeMillis();
@@ -89,7 +110,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
                 count = 0;
             }
 
-            sendMessages(ctx, curRate);
+            sendEvents(ctx, curRate);
 
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
@@ -99,17 +120,18 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     private void warmup(SourceContext<Auction> ctx) throws InterruptedException {
         int curRate = rate + base; //  (sin0 + 1) * rate + base
+//        curRate = 2000;
         long startTs = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTs < warmUpInterval) {
             long emitStartTime = System.currentTimeMillis();
 
-            sendMessages(ctx, curRate);
+            sendEvents(ctx, curRate);
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
         }
     }
 
-    private void sendMessages(SourceContext<Auction> ctx, int curRate){
+    private void sendEvents(SourceContext<Auction> ctx, int curRate){
 
         for (int i = 0; i < curRate / 20; i++) {
             long nextId = nextId();
@@ -121,7 +143,8 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
                             config.nextEventNumber(eventsCountSoFar)).getKey();
 
 //                ctx.collect(AuctionGenerator.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config));
-            Auction auction = generatorZipf.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config);
+            Auction auction = generatorZipf.nextAuction(eventsCountSoFar, nextId, rnd, DateTime.now().getMillis(), config);
+
             ctx.collect(auction);
             eventsCountSoFar++;
         }

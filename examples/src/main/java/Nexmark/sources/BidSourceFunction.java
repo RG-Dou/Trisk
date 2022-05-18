@@ -18,11 +18,14 @@
 
 package Nexmark.sources;
 
+import Nexmark.sources.generator.model.BidGeneratorZipf;
 import org.apache.beam.sdk.nexmark.NexmarkConfiguration;
+import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
 import org.apache.beam.sdk.nexmark.sources.generator.model.BidGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.joda.time.DateTime;
 
 import java.util.Random;
 
@@ -38,34 +41,39 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     private int cycle = 60;
     private int base = 0;
     private int warmUpInterval = 100000;
+    private BidGeneratorZipf zipf;
 
-    public BidSourceFunction(int srcRate, int cycle) {
-        this.rate = srcRate;
-        this.cycle = cycle;
+    public BidSourceFunction(int srcRate) {
+        this(srcRate, 0);
     }
 
-    public BidSourceFunction(int srcRate, int cycle, int base) {
-        this.rate = srcRate;
-        this.cycle = cycle;
-        this.base = base;
+    public BidSourceFunction(int srcRate, int base) {
+        this(srcRate, base, 60);
     }
 
-    public BidSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {
+    public BidSourceFunction(int srcRate, int base, int cycle) {
+        this(srcRate, base, cycle, 400000);
+    }
+
+    public BidSourceFunction(int srcRate, int base, int cycle, int warmUpInterval) {
+        this(srcRate, base, cycle, warmUpInterval, 10000);
+    }
+
+    public BidSourceFunction(int base, long keys){
+        this(0, base, 60, 400000, keys);
+    }
+
+    public BidSourceFunction(int srcRate, int base, int cycle, int warmUpInterval, long keys){
         this.rate = srcRate;
         this.cycle = cycle;
         this.base = base;
         this.warmUpInterval = warmUpInterval;
         NexmarkConfiguration nexconfig = NexmarkConfiguration.DEFAULT;
-//        nexconfig.hotBiddersRatio=1;
         nexconfig.hotAuctionRatio=1;
-//        nexconfig.numInFlightAuctions=1;
-//        nexconfig.numEventGenerators=1;
         config = new GeneratorConfig(nexconfig, 1, 1000L, 0, 1);
+        zipf = new BidGeneratorZipf(keys);
     }
 
-    public BidSourceFunction(int srcRate) {
-        this.rate = srcRate;
-    }
 
     @Override
     public void run(SourceContext<Bid> ctx) throws Exception {
@@ -81,25 +89,9 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
         long startTs = System.currentTimeMillis();
 
         while (running) {
-            long emitStartTime = System.currentTimeMillis();
-
             if (System.currentTimeMillis() - startTs < warmUpInterval) {
-                for (int i = 0; i < curRate / 20; i++) {
-
-                    long nextId = nextId();
-                    Random rnd = new Random(nextId);
-
-                    // When, in event time, we should generate the event. Monotonic.
-                    long eventTimestamp =
-                            config.timestampAndInterEventDelayUsForEvent(
-                                    config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                    ctx.collect(BidGenerator.nextBid(nextId, rnd, eventTimestamp, config));
-                    eventsCountSoFar++;
-                }
-
-                // Sleep for the rest of timeslice if needed
-                Util.pause(emitStartTime);
+                curRate = 10;
+                sendEvents(ctx, curRate);
             } else { // after warm up
                 if (count == 20) {
                     // change input rate every 1 second.
@@ -108,50 +100,37 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
                     System.out.println("epoch: " + epoch % cycle + " current rate is: " + curRate);
                     count = 0;
                 }
-
-                for (int i = 0; i < curRate / 20; i++) {
-
-                    long nextId = nextId();
-                    Random rnd = new Random(nextId);
-
-                    // When, in event time, we should generate the event. Monotonic.
-                    long eventTimestamp =
-                            config.timestampAndInterEventDelayUsForEvent(
-                                    config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                    ctx.collect(BidGenerator.nextBid(nextId, rnd, eventTimestamp, config));
-                    eventsCountSoFar++;
-                }
-
-                // Sleep for the rest of timeslice if needed
-                Util.pause(emitStartTime);
+                sendEvents(ctx, curRate);
                 count++;
             }
         }
     }
 
     private void warmup(SourceContext<Bid> ctx) throws InterruptedException {
-        int curRate = rate + base; //  (sin0 + 1)
+        int curRate = rate + base/10; //  (sin0 + 1)
         long startTs = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTs < warmUpInterval) {
-            long emitStartTime = System.currentTimeMillis();
-            for (int i = 0; i < curRate / 20; i++) {
-
-                long nextId = nextId();
-                Random rnd = new Random(nextId);
-
-                // When, in event time, we should generate the event. Monotonic.
-                long eventTimestamp =
-                        config.timestampAndInterEventDelayUsForEvent(
-                                config.nextEventNumber(eventsCountSoFar)).getKey();
-
-                ctx.collect(BidGenerator.nextBid(nextId, rnd, eventTimestamp, config));
-                eventsCountSoFar++;
-            }
-
-            // Sleep for the rest of timeslice if needed
-            Util.pause(emitStartTime);
+            sendEvents(ctx, curRate);
         }
+    }
+
+    private void sendEvents(SourceContext<Bid> ctx, int curRate) throws InterruptedException {
+        long emitStartTime = System.currentTimeMillis();
+        for (int i = 0; i < curRate / 20; i++) {
+
+            long nextId = nextId();
+            Random rnd = new Random(nextId);
+
+            // When, in event time, we should generate the event. Monotonic.
+            long eventTimestamp =
+                    config.timestampAndInterEventDelayUsForEvent(
+                            config.nextEventNumber(eventsCountSoFar)).getKey();
+
+            ctx.collect(zipf.nextBid(nextId, rnd, DateTime.now().getMillis(), config));
+            eventsCountSoFar++;
+        }
+        // Sleep for the rest of timeslice if needed
+        Util.pause(emitStartTime);
     }
 
     @Override

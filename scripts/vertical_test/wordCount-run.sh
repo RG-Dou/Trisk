@@ -11,30 +11,25 @@ init() {
   # app level
   FLINK_DIR="/home/drg/projects/work3/flink/Trisk/Trisk-on-Flink/build-target/"
   FLINK_APP_DIR="/home/drg/projects/work3/flink/Trisk/examples/"
+  LATENCY_DIR="/home/drg/projects/work3/flink/data/trisk/"
   JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
   readonly SAVEPOINT_PATH="/home/drg/projects/work3/temp/"
-  if [[ "$2" = "q3" ]]; then
-    JOB="Nexmark.queries.Query3Stateful"
-  elif [[ "$2" = "q5" ]]; then
-    JOB="Nexmark.queries.Query5Keyed"
-  elif [[ "$2" = "q8" ]]; then
-    JOB="Nexmark.queries.Query8Keyed"
-  fi
-  EXP_NAME="nexmark-$2"
+  JOB="flinkapp.wordcount.StatefulWordCountBigState"
+  EXP_NAME="wordcount"
 
-#  partitions=128
-#  parallelism=1
-  AUCTION_S=20000
-  PERSON_S=10000000
-  AUCTION_P=1
-  PERSON_P=1
-  JOIN_P=1
+  srcRate=30
   runtime=600
   blockCacheSize=$1
+  readCount=2
   ROCKSDB_LOG_DIR="/home/drg/projects/work3/flink/rocksdb-storage/logdir/"
-  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}"
+  ROCKSDB_DATA="/home/drg/projects/work3/flink/rocksdb-storage/localdir/"
+  rm -rf ${ROCKSDB_DATA}*
+  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/access_times/${readCount}"
+#  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/state_size/${readCount}"
+  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
+  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 }
 
 # config block cache size
@@ -81,6 +76,7 @@ function cleanEnv() {
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
   mv ${FLINK_DIR}log/* ${DATA_DIR}/${blockCacheSize}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${blockCacheSize}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
@@ -104,9 +100,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-join ${JOIN_P} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -srcRate ${srcRate} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-join ${JOIN_P} &
+  nohup $FLINK run -c ${JOB} ${JAR} -srcRate ${srcRate} &
 }
 
 function runGenerator() {
@@ -135,7 +131,7 @@ run_one_exp() {
   configApp
 
   # compute n_tuples from per task rates and parallelism
-  echo "INFO: run exp Nexmark exchange"
+  echo "INFO: run exp word count"
 #  configFlink
   runFlink
   python3 -c 'import time; time.sleep(5)'
@@ -152,6 +148,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2
+init $1
 run_one_exp
 #test

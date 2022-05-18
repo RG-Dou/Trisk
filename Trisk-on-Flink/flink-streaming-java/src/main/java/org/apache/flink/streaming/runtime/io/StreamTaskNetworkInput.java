@@ -209,13 +209,19 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 			long latency = System.currentTimeMillis() - record.getLatencyTimestamp();
 			endToEndLatency += latency;
 			metricsManager.groundTruth(record.getLatencyTimestamp(), latency);
+//			if(metricsManager.getJobVertexId()!=null && metricsManager.getJobVertexId().contains("join") && recordsProcessed == 1)
+//				System.out.println(metricsManager.getJobVertexId() + ": tuple delay: " + latency);
 		} else if (recordOrMark.isWatermark()) {
-			long processingStart = System.nanoTime();
+//			long processingStart = System.nanoTime();
 
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel);
-
-			processingDuration += System.nanoTime() - processingStart;
-			recordsProcessed++;
+			long lag = System.currentTimeMillis() - recordOrMark.asWatermark().getTimestamp();
+//			System.out.println(metricsManager.getJobVertexId() + ": lag: " + lag);
+//			processingDuration += System.nanoTime() - processingStart;
+//			recordsProcessed++;
+//			if(metricsManager.getJobVertexId()!=null && metricsManager.getJobVertexId().contains("join")){
+//				System.out.println(metricsManager.getJobVertexId() + ": watermark index:" + recordsProcessed + ", lag: " + lag);
+//			}
 		} else if (recordOrMark.isLatencyMarker()) {
 			output.emitLatencyMarker(recordOrMark.asLatencyMarker());
 		} else if (recordOrMark.isStreamStatus()) {

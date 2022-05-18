@@ -18,13 +18,14 @@
 
 package Nexmark.queries;
 
-import Nexmark.sinks.DummyLatencyCountingSinkOutput;
+import Nexmark.sinks.DummyLatencyCountingSink;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.PersonSourceFunction;
+import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Person;
 import org.apache.commons.math3.random.RandomDataGenerator;
-import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
@@ -44,16 +45,24 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.streaming.api.watermark.Watermark;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.triggers.Trigger;
+import org.apache.flink.streaming.api.windowing.triggers.TriggerResult;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Random;
 
-public class Query3Stateful {
+public class Query3StatefulWindow {
 
-private static final Logger logger  = LoggerFactory.getLogger(Query3Stateful.class);
+private static final Logger logger  = LoggerFactory.getLogger(Query3StatefulWindow.class);
 
 public static void main(String[] args) throws Exception {
 
@@ -64,9 +73,9 @@ public static void main(String[] args) throws Exception {
     final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
     // enable latency tracking
-//    env.getConfig().setLatencyTrackingInterval(1000);
+    env.getConfig().setLatencyTrackingInterval(1000);
 
-    env.enableCheckpointing(10000);
+//    env.enableCheckpointing(1000);
     env.getConfig().setAutoWatermarkInterval(1);
 
     env.disableOperatorChaining();
@@ -77,31 +86,22 @@ public static void main(String[] args) throws Exception {
 
     final long stateSize = params.getLong("state-size", 20);
 
-    final long keys = params.getLong("keys", 10);
-
-    DataStream<Auction> auctions = env.addSource(new AuctionSourceFunction(auctionSrcRate, stateSize, keys))
+    DataStream<Auction> auctions = env.addSource(new AuctionSourceFunction(auctionSrcRate, stateSize))
             .name("Custom Source: Auctions")
             .setParallelism(params.getInt("p-auction-source", 1)).slotSharingGroup("source")
-            .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).name("TimeAssigner: Auction").slotSharingGroup("source");
-//            .filter(new FilterFunction<Auction>() {
-//                @Override
-//                public boolean filter(Auction auction) throws Exception {
-//                    return true;
-//                }
-//            })
-//            .setParallelism(params.getInt("p-auction-source", 1)).name("Filter: Auction").slotSharingGroup("source");
+            .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).slotSharingGroup("source");
 
     DataStream<Person> persons = env.addSource(new PersonSourceFunction(personSrcRate, stateSize))
             .name("Custom Source: Persons")
             .setParallelism(params.getInt("p-person-source", 1)).slotSharingGroup("source")
-            .assignTimestampsAndWatermarks(new PersonTimestampAssigner()).name("TimeAssigner: Persons").slotSharingGroup("source");
 //            .filter(new FilterFunction<Person>() {
 //                @Override
 //                public boolean filter(Person person) throws Exception {
-//                    return true;
+//                    return (person.state.equals("OR") || person.state.equals("ID") || person.state.equals("CA"));
 //                }
 //            })
-//            .setParallelism(params.getInt("p-person-source", 1)).name("Filter: Person").slotSharingGroup("source");
+//            .setParallelism(params.getInt("p-person-source", 1)).slotSharingGroup("source")
+            .assignTimestampsAndWatermarks(new PersonTimestampAssigner()).slotSharingGroup("source");
 
     // SELECT Istream(P.name, P.city, P.state, A.id)
     // FROM Auction A [ROWS UNBOUNDED], Person P [ROWS UNBOUNDED]
@@ -126,68 +126,50 @@ public static void main(String[] args) throws Exception {
   DataStream<Tuple4<String, String, String, Long>> joined = keyedAuctions.connect(keyedPersons)
           .flatMap(new JoinPersonsWithAuctions()).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup("join");
 
-    DataStream<Tuple4<String, String, String, Long>> flatMap = joined.flatMap(new FlatMapFunction<Tuple4<String, String, String, Long>, Tuple4<String, String, String, Long>>() {
-        @Override
-        public void flatMap(Tuple4<String, String, String, Long> value, Collector<Tuple4<String, String, String, Long>> collector) throws Exception {
-            collector.collect(value);
+    DataStream<Long> window = joined.keyBy(new KeySelector<Tuple4<String, String, String, Long>, Long>() {
+        public Long getKey(Tuple4<String, String, String, Long> tuple4) throws Exception{
+            long start = System.nanoTime();
+            while (System.nanoTime() - start < 100_000) {}
+            return tuple4.f3;
         }
-    }).name("Simple FlapMap").setParallelism(params.getInt("p-sink", 1)).slotSharingGroup("sink");
+    }).window(TumblingEventTimeWindows.of(Time.seconds(1)))
+            .trigger(new DummyTrigger())
+            .aggregate(new CountResult())
+            .name("Sliding Window")
+            .setParallelism(params.getInt("p-window", 1)).slotSharingGroup("sink");
 
     GenericTypeInfo<Object> objectTypeInfo = new GenericTypeInfo<>(Object.class);
-    flatMap.transform("Sink", objectTypeInfo, new DummyLatencyCountingSinkOutput<>(logger))
+    window.transform("Sink", objectTypeInfo, new DummyLatencyCountingSink<>(logger))
             .setParallelism(params.getInt("p-sink", 1)).slotSharingGroup("sink");
 
     // execute program
-//    env.execute("Nexmark Query3 stateful");
-    env.execute("Nexmark Query");
+    env.execute("Nexmark Query3 stateful");
 }
 
+private static final class CountResult implements AggregateFunction<Tuple4<String, String, String, Long>, Long, Long> {
 
-private static final class PersonTimestampAssigner implements AssignerWithPeriodicWatermarks<Person> {
-    private long maxTimestamp = Long.MIN_VALUE;
 
-    @Nullable
     @Override
-    public Watermark getCurrentWatermark() {
-        long now = System.currentTimeMillis();
-        long isPunch = now % 1000;
-        if((isPunch < 2) || (isPunch > 998))
-            return new Watermark(now);
-        return null;
-//        return new Watermark(maxTimestamp);
+    public Long createAccumulator() {
+        return 0L;
     }
 
     @Override
-    public long extractTimestamp(Person element, long previousElementTimestamp) {
-        long timestamp = System.currentTimeMillis();
-//        maxTimestamp = Math.max(maxTimestamp, element.dateTime);
-        maxTimestamp = Math.max(maxTimestamp, timestamp);
-        return timestamp;
-    }
-}
-
-private static final class AuctionTimestampAssigner implements AssignerWithPeriodicWatermarks<Auction> {
-    private long maxTimestamp = Long.MIN_VALUE;
-
-    @Nullable
-    @Override
-    public Watermark getCurrentWatermark() {
-        long now = System.currentTimeMillis();
-        long isPunch = now % 1000;
-        if((isPunch < 2) || (isPunch > 998))
-            return new Watermark(now);
-        return null;
-//        return new Watermark(maxTimestamp);
+    public Long add(Tuple4<String, String, String, Long> value, Long accumulator) {
+        return accumulator + 1;
     }
 
     @Override
-    public long extractTimestamp(Auction element, long previousElementTimestamp) {
-        long timestamp = System.currentTimeMillis();
-//        maxTimestamp = Math.max(maxTimestamp, element.dateTime);
-        maxTimestamp = Math.max(maxTimestamp, timestamp);
-        return timestamp;
+    public Long getResult(Long accumulator) {
+        return accumulator;
+    }
+
+    @Override
+    public Long merge(Long a, Long b) {
+        return a + b;
     }
 }
+
 
 private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction<Auction, Person, Tuple4<String, String, String, Long>> {
 
@@ -198,6 +180,7 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
 //    private HashMap<Long, HashSet<Long>> auctionMap = new HashMap<>();
 //    private MapState<Long, HashSet<Long>> auctionMap;
     private RandomDataGenerator randomGen = new RandomDataGenerator();
+    private Random random = new Random();
 
     private final int readCounter = 15;
     private final int writeCounter = 30;
@@ -234,9 +217,9 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
         if (personMap.contains(auction.seller)) {
             // emit and don't store
             Tuple3<String, String, String> match = personMap.get(auction.seller);
-//            out.collect(new Tuple4<>(match.f0, match.f1, match.f1, auction.seller));
+            if(random.nextInt(10) == 0)
+                out.collect(new Tuple4<>(match.f0, match.f1, match.f1, auction.id));
         }
-
 //        System.out.println("ts: " + startTime + " endToEnd Latency1: " + ((System.nanoTime() - start - subStruct) / 1000000.0));
 //        out.collect(new Tuple4<>(auction.description, auction.itemName, auction.itemName, auction.id));
 //        for (long i = 0; i < readCounter; i ++){
@@ -246,17 +229,11 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
 //                out.collect(new Tuple4<>(match.f0, match.f1, match.f1, auction.id));
 //            }
 //        }
-
 //        if(taskIndex == 0)
-            delay(1_000_000);
-        out.collect(new Tuple4<>(auction.itemName, auction.itemName, auction.itemName, auction.seller));
-//          delay(250_000);
-
-//        if(taskIndex == 2)
-//            delay(250_000);
+            delay(500_000);
 //        else
 //            delay(1_000_000);
-//        delay(500_000);
+//        delay(1_000_000);
 //        long start = System.nanoTime();
 //        System.out.println("flap map 1: " + ((System.nanoTime() - start) / 1000000.0));
 //        else {
@@ -304,7 +281,7 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
         //delay 0.1ms
 //        delay(100_000);
 //        if(taskIndex == 0)
-            delay(1_000_000);
+//            delay(2_000_000);
     }
 
     public void metricsDump() throws Exception {

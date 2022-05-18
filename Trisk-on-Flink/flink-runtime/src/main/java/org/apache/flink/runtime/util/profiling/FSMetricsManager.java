@@ -199,7 +199,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000000;
 				double observedProcessingRate = (recordsIn / (duration / 1000.0)) * 1000000;
 				double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
-				outputStreamDecorator.println(latency + " : " + recordsIn);
+//				outputStreamDecorator.println(latency + " : " + recordsIn);
 				float tupleLatency = (float) latency / recordsIn;
 
 				double utilization = (double) usefulTime / duration;
@@ -243,6 +243,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				latencyMetrics.setServiceTime(avgUsefulTime);
 				String ratesLine = jobVertexId + ","
 					+ workerName + "-" + instanceId + ","
+					+ " observedProcessingRate: " + observedProcessingRate + ","
 					+ " avgProcessingTime: " + avgProcessingTime + ","
 					+ " endToEndLantecy: " + tupleLatency + ","
 					+ " avgUsefulTime: " + avgUsefulTime + ","
