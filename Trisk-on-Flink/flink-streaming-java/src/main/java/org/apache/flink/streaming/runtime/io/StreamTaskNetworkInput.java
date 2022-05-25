@@ -215,7 +215,7 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 //			long processingStart = System.nanoTime();
 
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel);
-			long lag = System.currentTimeMillis() - recordOrMark.asWatermark().getTimestamp();
+//			long lag = System.currentTimeMillis() - recordOrMark.asWatermark().getTimestamp();
 //			System.out.println(metricsManager.getJobVertexId() + ": lag: " + lag);
 //			processingDuration += System.nanoTime() - processingStart;
 //			recordsProcessed++;

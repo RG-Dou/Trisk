@@ -53,6 +53,6 @@ final class RocksDBSharedResources implements AutoCloseable {
 	}
 
 	public void resizeCache(long target){
-//		MemoryUtil.cacheResize(cache, target);
+		MemoryUtil.cacheResize(cache, target);
 	}
 }

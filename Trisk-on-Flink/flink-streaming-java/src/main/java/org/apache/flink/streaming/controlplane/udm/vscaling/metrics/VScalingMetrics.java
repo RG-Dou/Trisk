@@ -126,7 +126,7 @@ public class VScalingMetrics {
 	}
 
 	public void setTupleLatency(String operatorId, int taskIndex, double latency){
-		operatorMap.get(operatorId).getTaskMetrics(taskIndex).setTupleLatency(latency);
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setTupleLatency(latency);
 	}
 
 	public void setNumRecordsIn(String operatorId, int taskIndex, long recordsIn){
