@@ -14,11 +14,16 @@
 # limitations under the License.
 
 
-#cd flink-core || exit
-#mvn clean install -Dcheckstyle.skip -Dski1Tests -Dmaven.javadoc.skip -Drat.skip=true
-cd flink-runtime || exit
+# cd flink-core || exit
+# mvn clean install -Dcheckstyle.skip -Dski1Tests -Dmaven.javadoc.skip -Drat.skip=true
+cd flink-streaming-java || exit
 mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true
-cd ../flink-streaming-java || exit
-mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true
+cp ../flink-streaming-java/target/flink-streaming-java_2.11-1.10-SNAPSHOT.jar ../build-target/lib/
+#cd ../flink-runtime || exit
+#mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true
+#cp ../flink-runtime/target/flink-runtime_2.11-1.10-SNAPSHOT.jar ../build-target/lib/
+#cd ../flink-state-backends/flink-statebackend-rocksdb || exit
+#mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true
+#cp ../../flink-state-backends/flink-statebackend-rocksdb/target/flink-statebackend-rocksdb_2.11-1.10-SNAPSHOT.jar  ../../build-target/lib/
 #cd ../flink-clients || exit
 #mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true

@@ -46,7 +46,7 @@ jobmanager.heap.size: 1024m
 #
 # Note this accounts for all memory usage within the TaskManager process, including JVM metaspace and other overhead.
 
-taskmanager.memory.process.size: 10240m
+taskmanager.memory.process.size: 4096m
 
 # To exclude JVM metaspace and overhead, please, use total Flink memory size instead of 'taskmanager.memory.process.size'.
 # It is not recommended to set both 'taskmanager.memory.process.size' and Flink memory.
@@ -193,7 +193,7 @@ jobmanager.execution.failover-strategy: region
 # no tuning. Adjusting them may be necessary in case of an "Insufficient number
 # of network buffers" error. The default min is 64MB, the default max is 1GB.
 # 
-# taskmanager.memory.network.fraction: 0.1
+ taskmanager.memory.network.fraction: 0.1
 # taskmanager.memory.network.min: 64mb
 # taskmanager.memory.network.max: 1gb
 
@@ -259,11 +259,18 @@ jobmanager.execution.failover-strategy: region
 
 trisk.controller: ElasticMemoryManager
 
-trisk.reconfig.operator.name: Splitter FlatMap
-trisk.reconfig.interval: 0
-trisk.reconfig.affected_tasks: 2
-trisk.reconfig.type: noop
+policy.windowSize: 5000000000
+
+#trisk.reconfig.operator.name: Splitter FlatMap
+#trisk.reconfig.interval: 0
+#trisk.reconfig.affected_tasks: 2
+#trisk.reconfig.type: noop
 trisk.exp.dir: /data
+trisk.taskmanager.managed_memory: 3072
+trisk.vScaling.python.path: /home/drg/projects/work3/flink/Trisk/Trisk-on-Flink/tools
+trisk.config.schedule_interval: 30000
+trisk.config.metrics_interval: 1000
+trisk.simple_test: false
 
 #==============================================================================
 # Backpressure Configuration
@@ -274,9 +281,41 @@ web.backpressure.refresh-interval: 600000000
 web.backpressure.num-samples: 10000000
 web.backpressure.delay-between-samples: 100000000
 #taskmanager.network.numberOfBuffers: 102400
-taskmanager.network.memory.buffers-per-channel: 10000000
-taskmanager.network.memory.floating-buffers-per-gate: 10000000
+taskmanager.network.memory.buffers-per-channel: 100
+taskmanager.network.memory.floating-buffers-per-gate: 100
 taskmanager.network.memory.max: 10gb
 akka.framesize: 1048576000b
+execution.buffer-timeout: 0
 
 taskmanager.network.credit-model: false
+
+#==============================================================================
+# Rocksdb Configuration
+# =============================================================================
+#
+state.backend: rocksdb
+state.backend.incremental: true
+state.checkpoints.dir: file:///home/drg/projects/work3/flink/rocksdb-storage/checkpoint/
+state.backend.rocksdb.localdir: /home/drg/projects/work3/flink/rocksdb-storage/localdir/
+state.backend.rocksdb.log.dir: /home/drg/projects/work3/flink/rocksdb-storage/logdir/
+state.backend.rocksdb.options-factory: rocksdbTuning.StatisticConfigurableOptionsFactory
+#state.backend.rocksdb.block.cache-size: 20m
+#state.backend.rocksdb.memory.high-prio-pool-ratio: 0.8
+#state.backend.rocksdb.memory.write-buffer-ratio: 0.1
+# metrics.latency.interval: 100
+metrics.latency.history-size: 20
+metrics.latency.granularity: single
+state.backend.rocksdb.memory.managed: true
+state.backend.rocksdb.use-bloom-filter: true
+state.backend.rocksdb.bloom-filter.block-based-mode: true
+# state.backend.rocksdb.block.metadata-blocksize: 16kb
+state.backend.rocksdb.memory.partitioned-index-filters: true
+state.backend.rocksdb.metrics.block-cache-capacity: true
+state.backend.rocksdb.metrics.block-cache-usage: true
+# state.backend.rocksdb.metrics.total-sst-files-size: true
+state.backend.latency-track.keyed-state-enabled: true
+state.backend.latency-track.sample-interval: 2
+state.backend.latency-track.history-size: 1000
+state.backend.rocksdb.thread.num: 16
+state.backend.rocksdb.write-batch-size: 40m
+state.backend.rocksdb.writebuffer.count: 40
