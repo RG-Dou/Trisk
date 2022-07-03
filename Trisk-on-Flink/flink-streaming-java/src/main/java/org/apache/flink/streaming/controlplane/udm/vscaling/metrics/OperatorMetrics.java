@@ -1,6 +1,7 @@
 package org.apache.flink.streaming.controlplane.udm.vscaling.metrics;
 
-import org.apache.flink.runtime.taskmanager.Task;
+import org.apache.commons.math3.stat.regression.SimpleRegression;
+import org.apache.flink.api.java.tuple.Tuple2;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,16 +10,25 @@ import java.util.Map;
 public class OperatorMetrics {
 
 
+	// Basic information
 	private final String id;
 	private final String operatorName;
-
 	private final ArrayList<TaskMetrics> taskMetricsList = new ArrayList<>();
-	private final ArrayList<String> stateNames = new ArrayList<>();
-	private final Map<String, String> stateAccessTags = new HashMap<>();
+	private final LinearAlgorithm linearAlgorithm;
+	private String stateName;
+	private String stateTag;
+	private boolean stateful = false;
+
+	// Raw Data
+	private double stateSize;
+	private double alpha;
+	private double beta;
+	private double k;
 
 	public OperatorMetrics(String id, String name){
 		this.id = id;
 		this.operatorName = name;
+		linearAlgorithm = new LinearAlgorithm(10);
 	}
 
 	public String getId() {
@@ -38,33 +48,30 @@ public class OperatorMetrics {
 	}
 
 	public void addState(String stateName){
-		if(stateNames.contains(stateName))
-			return;
-		stateNames.add(stateName);
+		this.stateName = stateName;
+		stateful = true;
 		for(TaskMetrics taskMetrics : taskMetricsList){
 			StateMetrics state = new StateMetrics(stateName);
 			taskMetrics.putState(stateName, state);
 		}
 	}
 
-	public ArrayList<String> getStateList(){
-		return stateNames;
+	public String getStateName(){
+		if (stateful)
+			return stateName;
+		else return null;
 	}
 
-	public int getNumStates(){
-		return stateNames.size();
+	public boolean isStateful(){
+		return stateful;
 	}
 
-	public void setStateAccessTimeTag(String stateName, String tag){
-		stateAccessTags.put(stateName, tag);
-		for(TaskMetrics taskMetrics : taskMetricsList){
-			StateMetrics state = taskMetrics.getStateMetric(stateName);
-			state.setAccessTimeTag(tag);
-		}
+	public void setStateAccessTimeTag(String tag){
+		stateTag = tag;
 	}
 
-	public String getStateAccessTimeTag(String stateName){
-		return this.stateAccessTags.get(stateName);
+	public String getStateTag(){
+		return stateTag;
 	}
 
 	public String getOperatorName() {
@@ -77,67 +84,88 @@ public class OperatorMetrics {
 		}
 	}
 
-	public void updateTaskStateSize(){
+	public void updateStateSize(){
+		long counter = 0;
+		double sum = 0.0;
+		for (TaskMetrics taskMetrics : taskMetricsList){
+			StateMetrics state = taskMetrics.getStateMetric();
+			counter += state.getAccessCounter();
+			sum += state.getAccessCounter() * state.getStateSize();
+		}
+		stateSize = sum / counter;
+	}
+
+	public void updatek(){
+		long recordsIn = 0;
+		long stateAccessCounter = 0;
+		for (TaskMetrics taskMetrics : taskMetricsList){
+			recordsIn += taskMetrics.getRecordsIn();
+			StateMetrics state = taskMetrics.getStateMetric();
+			stateAccessCounter += state.getAccessCounter();
+		}
+		k = stateAccessCounter * 1.0 / recordsIn;
+	}
+
+	public void updateFrontEndTime(){
 		for(TaskMetrics taskMetrics : taskMetricsList){
-			taskMetrics.updateStateSize();
+			taskMetrics.updateFrontEndTime(k);
 		}
 	}
 
-	public void updateKandB(){
+	public void updateBacklog(){
 		for(TaskMetrics taskMetrics : taskMetricsList){
-			taskMetrics.updateKandB();
+			taskMetrics.updateBacklog();
 		}
 	}
 
-	public void updateQueuingTime(){
-		for(TaskMetrics taskMetrics : taskMetricsList){
-			taskMetrics.updateQueuingTime();
+	public void training(){
+		for (TaskMetrics task : taskMetricsList){
+			StateMetrics state = task.getStateMetric();
+			linearAlgorithm.addData(1 - state.getHitRatio(), state.getAccessTime());
 		}
+		linearAlgorithm.excRegression();
+		this.alpha = linearAlgorithm.getSlope();
+		this.beta = linearAlgorithm.getIntercept();
 	}
 
-	public void updateAlignmentTime(){
-		for(TaskMetrics taskMetrics : taskMetricsList){
-			taskMetrics.updateAlignmentTime();
-		}
+	public double getAlpha(){
+		return alpha;
 	}
 
-	public void updateEndToEndLatency(){
-		for(TaskMetrics taskMetrics : taskMetricsList){
-			taskMetrics.updateEndToEndLatency();
-		}
+	public double getBeta(){
+		return beta;
 	}
 
-	public String qtimeString(){
+	public double getStateSize(){
+		return stateSize;
+	}
+
+	public double getk(){
+		return k;
+	}
+
+	public String taskInstancesToString(){
 		StringBuilder builder = new StringBuilder();
 		for (TaskMetrics task : taskMetricsList){
-			builder.append(task.getQueuingTime()).append(";");
+			builder.append(task.getInstanceID()).append(";");
 		}
 		builder.deleteCharAt(builder.lastIndexOf(";"));
 		return builder.toString();
 	}
 
-	public String ksString(){
+	public String frontEndToString(){
 		StringBuilder builder = new StringBuilder();
 		for (TaskMetrics task : taskMetricsList){
-			builder.append(task.ksString()).append(";");
+			builder.append(task.getFrontEndTime()).append(";");
 		}
 		builder.deleteCharAt(builder.lastIndexOf(";"));
 		return builder.toString();
 	}
 
-	public String bsString(){
+	public String backlogString(){
 		StringBuilder builder = new StringBuilder();
 		for (TaskMetrics task : taskMetricsList){
-			builder.append(task.bsString()).append(";");
-		}
-		builder.deleteCharAt(builder.lastIndexOf(";"));
-		return builder.toString();
-	}
-
-	public String stateSizeToString(){
-		StringBuilder builder = new StringBuilder();
-		for (TaskMetrics task : taskMetricsList){
-			builder.append(task.getStateSize()).append(";");
+			builder.append(task.getBacklog()).append(";");
 		}
 		builder.deleteCharAt(builder.lastIndexOf(";"));
 		return builder.toString();
@@ -163,11 +191,64 @@ public class OperatorMetrics {
 
 	public String toSting(){
 		String str = "operator: " + operatorName + ", id: " + id +
-			", numTask: " + getNumTasks() + ", States: " + stateNames +
+			", numTask: " + getNumTasks() +
 			" {" + "\n";
 		for (TaskMetrics task : taskMetricsList){
 			str+=task.toString() + "\n";
 		}
 		return str+"}";
+	}
+}
+
+class LinearAlgorithm{
+
+	private final int totalRegions;
+	private final SimpleRegression regression = new SimpleRegression();
+
+	//hit ratio
+	private final Map<Integer, Tuple2<Long, Double>> xs = new HashMap<>();
+	//access time
+	private final Map<Integer, Tuple2<Long, Double>> ys = new HashMap<>();
+
+	public LinearAlgorithm(int totalRegions){
+		this.totalRegions = totalRegions;
+	}
+
+	public void addData(double x, double y){
+		int region = (int) (x * 100) / totalRegions;
+		Tuple2<Long, Double> xRecords = xs.get(region);
+		if(xRecords == null)
+			xRecords = new Tuple2<>(0L, 0.0);
+		xRecords.f1 += x;
+		xRecords.f0 += 1;
+		xs.put(region, xRecords);
+
+		Tuple2<Long, Double> yRecords = ys.get(region);
+		if(yRecords == null)
+			yRecords = new Tuple2<>(0L, 0.0);
+		yRecords.f1 += y;
+		yRecords.f0 += 1;
+		ys.put(region, yRecords);
+	}
+
+	public void excRegression(){
+		regression.clear();
+		for(Map.Entry<Integer, Tuple2<Long, Double>> entry : xs.entrySet()){
+			int region = entry.getKey();
+			Tuple2<Long, Double> xRecords = entry.getValue();
+			Tuple2<Long, Double> yRecords = ys.get(region);
+			regression.addData(xRecords.f1 / xRecords.f0, yRecords.f1 / yRecords.f0);
+		}
+		if(xs.size() <= 1){
+			regression.addData(1.0, 0);
+		}
+	}
+
+	public double getSlope(){
+		return regression.getSlope();
+	}
+
+	public double getIntercept(){
+		return regression.getIntercept();
 	}
 }

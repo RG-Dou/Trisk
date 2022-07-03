@@ -105,17 +105,15 @@ public class PythonAlgorithm{
 		long totalTasks = 0;
 		for(String operatorID : metrics.getOperatorList()){
 			OperatorMetrics operator = metrics.getOperator(operatorID);
-			ArrayList<String> stateList = operator.getStateList();
 			for(int taskIndex = 0; taskIndex < operator.getNumTasks(); taskIndex++){
 				TaskMetrics task = operator.getTaskMetrics(taskIndex);
-				double stateSize = task.getStateSize();
-				long totalItems = 0;
-				for(String stateName : stateList){
-					totalItems += task.getStateMetric(stateName).getItemFrequency().size();
-				}
+				double stateSize = task.getStateMetric().getStateSize();
+				long totalItems = task.getStateMetric().getItemFrequency().size();
+
 				long maxSize = (long) (totalItems * stateSize);
 				totalMax += maxSize;
 				String slotID = task.getSlotID();
+				System.out.println("Task: " + taskIndex + "total state: " + maxSize);
 				maxAllocation.put(slotID, maxSize);
 			}
 			totalTasks += operator.getNumTasks();
@@ -137,7 +135,7 @@ public class PythonAlgorithm{
 		String stringBuilder = "[info]\n" +
 			"operator.num=" + metrics.getNumOperator() + "\n" +
 			"task.num=" + metrics.numTasksToString() + "\n" +
-			"state.num=" + metrics.numStatesToString() + "\n" +
+			"task.instance=" + metrics.taskInstancesToString() + "\n" +
 			"memory.size=" + metrics.getTotalMem() + "\n";
 		writeFile(basicInfoFile, stringBuilder);
 	}
@@ -145,9 +143,11 @@ public class PythonAlgorithm{
 	private void publishMetrics(){
 		String stringBuilder = "[data]\n" +
 			"epoch=" + metrics.getEpoch() + "\n" +
-			"queuing.time=" + metrics.qTimeToString() + "\n" +
-			"ks=" + metrics.ksToString() + "\n" +
-			"bs=" + metrics.bsToString() + "\n" +
+			"frontEndTime=" + metrics.frontEndToString() + "\n" +
+			"k=" + metrics.kToString() + "\n" +
+			"backlog=" + metrics.backlogToString() + "\n" +
+			"alpha=" + metrics.alphaToString() + "\n" +
+			"beta=" + metrics.betaToString() + "\n" +
 			"state.size=" + metrics.stateSizesTaskToString() + "\n" +
 			"item.frequency=" + metrics.itemFrequencyToString() + "\n";
 		writeFile(metricsFile, stringBuilder);
@@ -212,25 +212,17 @@ public class PythonAlgorithm{
 
 		int operatorIndex = 0;
 		int taskIndex = 0;
-		int stateIndex = 0;
 		ArrayList<String> operators = metrics.getOperatorList();
 		for(String item : hitRatios.substring(1, hitRatios.length() - 1).split(", ")){
 			OperatorMetrics operator = metrics.getOperator(operators.get(operatorIndex));
-			ArrayList<String> states = metrics.getOperatorState(operators.get(operatorIndex));
-			operator.getTaskMetrics(taskIndex).getStateMetric(states.get(stateIndex)).setHitRatio(Double.parseDouble(item));
-
-			// Hop one task index
-			if(stateIndex >= states.size() - 1) {
-				taskIndex += 1;
-				stateIndex = 0;
-			} else {
-				stateIndex += 1;
-			}
+			operator.getTaskMetrics(taskIndex).getStateMetric().setHitRatio(Double.parseDouble(item));
 
 			// Hop one operator index
 			if (taskIndex >= operator.getNumTasks()){
 				operatorIndex += 1;
 				taskIndex = 0;
+			} else {
+				taskIndex += 1;
 			}
 		}
 	}

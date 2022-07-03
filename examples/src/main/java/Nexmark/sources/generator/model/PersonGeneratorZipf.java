@@ -64,8 +64,8 @@ public class PersonGeneratorZipf implements Serializable {
 
 //        long id = lastBase0PersonId(nextEventId) + GeneratorConfig.FIRST_PERSON_ID;
 //        long id = zipf.next();
-        long id = random.nextInt(10000);
-        if(random.nextInt(2) == 0)
+        long id = random.nextInt(10);
+        if(random.nextInt(8) != 0)
             id = 0;
         String name = nextPersonName(random);
         String email = nextEmail(random);

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-bash nexmark-run.sh 1000 q20 true
-bash nexmark-run.sh 1000 q20 false
+bash nexmark-run.sh 800 q20 false
+bash nexmark-run.sh 800 q20 true
 
 # for StateSize in 300000; do
 #     for BlockCache in 03; do

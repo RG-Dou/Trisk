@@ -67,7 +67,8 @@ import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWi
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.udm.*;
-import org.apache.flink.streaming.controlplane.udm.vscaling.VerticalScalingTest;
+import org.apache.flink.streaming.controlplane.udm.vscaling.BlankController;
+import org.apache.flink.streaming.controlplane.udm.vscaling.ElasticMemoryManager;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -207,8 +208,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			case "FraudDetectionController":
 				this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
 				break;
-			case "VerticalScalingTest":
-				this.controlPolicyList.put("VerticalScalingTest", new VerticalScalingTest(this, streamManagerConfiguration.getConfiguration()));
+			case "ElasticMemoryManager":
+				this.controlPolicyList.put("ElasticMemoryManager", new ElasticMemoryManager(this, streamManagerConfiguration.getConfiguration()));
+				break;
+			case "BlankController":
+				this.controlPolicyList.put("BlankController", new BlankController(this, streamManagerConfiguration.getConfiguration()));
 				break;
 		}
 

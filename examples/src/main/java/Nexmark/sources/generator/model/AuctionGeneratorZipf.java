@@ -20,6 +20,7 @@ package Nexmark.sources.generator.model;
 
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
+import org.apache.commons.math3.random.RandomDataGenerator;
 import org.joda.time.Instant;
 
 import java.io.Serializable;
@@ -38,7 +39,7 @@ public class AuctionGeneratorZipf implements Serializable {
      * Keep the number of categories small so the example queries will find results even with a small
      * batch of events.
      */
-    private static final int NUM_CATEGORIES = 1;
+    private static final int NUM_CATEGORIES = 1000;
 
     /** Number of yet-to-be-created people and auction ids allowed. */
     private static final int AUCTION_ID_LEAD = 10;
@@ -52,6 +53,11 @@ public class AuctionGeneratorZipf implements Serializable {
     private ZipfUtil zipf;
 
     private final long keys;
+    public long nextID = 0;
+//    private static final RandomDataGenerator dataGen = new RandomDataGenerator();
+
+    private int index;
+    private int parallel;
 
     public AuctionGeneratorZipf(long size, double skew){
         this(size, skew, 10000);
@@ -82,14 +88,86 @@ public class AuctionGeneratorZipf implements Serializable {
         seller += GeneratorConfig.FIRST_PERSON_ID;
 
 //        seller = zipf.next();
-//        seller = random.nextInt(keys);
+//        seller = random.nextInt((int) keys);
 
 //        seller = zipf.nextFromFile();
 
         long category = GeneratorConfig.FIRST_CATEGORY_ID + random.nextInt(NUM_CATEGORIES);
         long initialBid = nextPrice(random);
 //        long expires = timestamp + nextAuctionLengthMs(eventsCountSoFar, random, timestamp, config);
-        long expires = timestamp + 10000;
+        long expires = timestamp + 5000000;
+        String name = nextString(random, 20);
+        String desc = nextString(random, 100);
+        long reserve = initialBid + nextPrice(random);
+        int currentSize = 8 + name.length() + desc.length() + 8 + 8 + 8 + 8 + 8;
+        String extra = nextExtra(random, currentSize, config.getAvgAuctionByteSize());
+        return new Auction(
+                id,
+                name,
+                desc,
+                initialBid,
+                reserve,
+                new Instant(timestamp).getMillis(),
+                new Instant(expires).getMillis(),
+                seller,
+                category,
+                extra);
+    }
+
+    /** Generate and return a random auction with next available id. */
+    public Auction nextAuctionWarmup(
+            long eventsCountSoFar, long eventId, Random random, long timestamp, GeneratorConfig config) {
+
+        long id = nextID * parallel + index;
+        if(id >= keys)
+            return null;
+        nextID ++;
+
+        long seller;
+        // Here P(auction will be for a hot seller) = 1 - 1/hotSellersRatio.
+        if (random.nextInt(config.getHotSellersRatio()) > 0) {
+            // Choose the first person in the batch of last HOT_SELLER_RATIO people.
+            seller = (lastBase0PersonId(eventId) / HOT_SELLER_RATIO) * HOT_SELLER_RATIO;
+        } else {
+            seller = nextBase0PersonId(eventId, random, config);
+        }
+        seller += GeneratorConfig.FIRST_PERSON_ID;
+
+        long category = GeneratorConfig.FIRST_CATEGORY_ID + random.nextInt(NUM_CATEGORIES);
+        long initialBid = nextPrice(random);
+//        long expires = timestamp + nextAuctionLengthMs(eventsCountSoFar, random, timestamp, config);
+        long expires = timestamp + 5000000;
+        String name = nextString(random, 20);
+        String desc = nextString(random, 100);
+        long reserve = initialBid + nextPrice(random);
+        int currentSize = 8 + name.length() + desc.length() + 8 + 8 + 8 + 8 + 8;
+        String extra = nextExtra(random, currentSize, config.getAvgAuctionByteSize());
+        return new Auction(
+                id,
+                name,
+                desc,
+                initialBid,
+                reserve,
+                new Instant(timestamp).getMillis(),
+                new Instant(expires).getMillis(),
+                seller,
+                category,
+                extra);
+    }
+
+    /** Generate and return a random auction with next available id. */
+    public Auction nextAuctionSellSkew(
+            long eventsCountSoFar, long eventId, Random random, long timestamp, GeneratorConfig config) {
+
+        long id = lastBase0AuctionId(eventId) + GeneratorConfig.FIRST_AUCTION_ID;
+
+        long seller = random.nextInt((int) keys);
+
+
+        long category = GeneratorConfig.FIRST_CATEGORY_ID + random.nextInt(NUM_CATEGORIES);
+        long initialBid = nextPrice(random);
+//        long expires = timestamp + nextAuctionLengthMs(eventsCountSoFar, random, timestamp, config);
+        long expires = timestamp + 5000000;
         String name = nextString(random, 20);
         String desc = nextString(random, 100);
         long reserve = initialBid + nextPrice(random);
@@ -164,5 +242,13 @@ public class AuctionGeneratorZipf implements Serializable {
         // Choose a length with average horizonMs.
         long horizonMs = futureAuction - timestamp;
         return 1L + nextLong(random, Math.max(horizonMs * 2, 1L));
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
+    }
+
+    public void setParallel(int parallel) {
+        this.parallel = parallel;
     }
 }

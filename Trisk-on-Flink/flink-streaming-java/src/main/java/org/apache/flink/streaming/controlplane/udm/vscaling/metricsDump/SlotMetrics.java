@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.controlplane.udm.vscaling.metrics;
+package org.apache.flink.streaming.controlplane.udm.vscaling.metricsDump;
 
 import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 
@@ -9,17 +9,15 @@ public class SlotMetrics {
 	private final String id;
 	private final TaskManagerSlot slot;
 	private final List<TaskMetrics> tasks = new ArrayList<>();
-	private final int taskInstance;
 
 	private String type;
 
 	private Long oldMemSize;
 	private Long targetMemSize;
 
-	public SlotMetrics(String id, TaskManagerSlot slot, int taskInstance){
+	public SlotMetrics(String id, TaskManagerSlot slot){
 		this.id = id;
 		this.slot = slot;
-		this.taskInstance = taskInstance;
 		type = "beyond this job";
 	}
 
@@ -59,8 +57,5 @@ public class SlotMetrics {
 		this.targetMemSize = targetMemSize;
 	}
 
-	public int getTaskInstance() {
-		return taskInstance;
-	}
 
 }

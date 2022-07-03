@@ -49,7 +49,7 @@ public class PersonSourceFunction extends RichParallelSourceFunction<Person> {
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base) {
-        this(srcRate, cycle, base, 25000);
+        this(srcRate, cycle, base, 10000);
     }
 
     public PersonSourceFunction(int srcRate, int cycle, int base, int warmUpInterval) {

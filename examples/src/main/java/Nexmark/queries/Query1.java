@@ -49,7 +49,7 @@ public class Query1 {
         // enable latency tracking
         env.getConfig().setLatencyTrackingInterval(5000);
 
-        final int srcRate = params.getInt("srcRate", 100000);
+        final int srcRate = params.getInt("bid-srcRate", 100000);
         final int srcCycle = params.getInt("srcCycle", 60);
         final int srcBase = params.getInt("srcBase", 0);
         final int srcWarmUp = params.getInt("srcWarmUp", 100);

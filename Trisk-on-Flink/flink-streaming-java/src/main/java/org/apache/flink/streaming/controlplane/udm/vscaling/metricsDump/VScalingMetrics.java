@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.controlplane.udm.vscaling.metrics;
+package org.apache.flink.streaming.controlplane.udm.vscaling.metricsDump;
 
 import java.util.*;
 
@@ -21,7 +21,6 @@ public class VScalingMetrics {
 
 	// Slot information
 	private final Map<String, SlotMetrics> slotsMap = new HashMap<>();
-	private final Map<Integer, List<SlotMetrics>> slotTMMap = new HashMap<>();
 
 	// Shrinking and expansion slots
 	private final List<SlotMetrics> shrinkingSlots = new ArrayList<>();
@@ -79,15 +78,6 @@ public class VScalingMetrics {
 		return result.toString();
 	}
 
-	public String taskInstancesToString(){
-		StringBuilder result = new StringBuilder();
-		for(String operatorId : operatorList){
-			result.append(operatorMap.get(operatorId).taskInstancesToString()).append("|");
-		}
-		result.deleteCharAt(result.lastIndexOf("|"));
-		return result.toString();
-	}
-
 	public void setStateName(String operatorId, String stateName){
 		if(!operatorMap.containsKey(operatorId)){
 			OperatorMetrics operator = operatorFullMap.get(operatorId);
@@ -97,73 +87,35 @@ public class VScalingMetrics {
 		operatorMap.get(operatorId).addState(stateName);
 	}
 
-	public String getOperatorState(String operatorId){
-		return operatorMap.get(operatorId).getStateName();
+	public ArrayList<String> getOperatorState(String operatorId){
+		return operatorMap.get(operatorId).getStateList();
 	}
 
-	public void setStateAccessTimeTag(String operatorId, String tag){
-		operatorMap.get(operatorId).setStateAccessTimeTag(tag);
+	public String numStatesToString(){
+		StringBuilder result = new StringBuilder();
+		for(String operatorId : operatorList){
+			result.append(operatorMap.get(operatorId).getNumStates()).append("|");
+		}
+		result.deleteCharAt(result.lastIndexOf("|"));
+		return result.toString();
 	}
 
-	public String getStateAccessTimeTag(String operatorId){
-		return operatorMap.get(operatorId).getStateTag();
+	public void setStateAccessTimeTag(String operatorId, String stateName, String tag){
+		operatorMap.get(operatorId).setStateAccessTimeTag(stateName, tag);
+	}
+
+	public String getStateAccessTimeTag(String operatorId, String stateName){
+		return operatorMap.get(operatorId).getStateAccessTimeTag(stateName);
 	}
 
 	public long getTotalMem() {
 		return totalMem;
 	}
 
-	public void setAccessTime(String operatorId, int taskIndex, double accessTime){
-		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().setAccessTime(accessTime);
-	}
-
-	public void setQueuingDelay(String operatorId, int taskIndex, double queuingTime){
-		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setQueuingTime(queuingTime);
-	}
-
-	public void setServiceTime(String operatorId, int taskIndex, double serviceTime){
-		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setServiceTime(serviceTime);
-	}
-
-	public void setNumRecordsIn(String operatorId, int taskIndex, long recordsIn){
-		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setRecordsIn(recordsIn);
-	}
-
-	public void setAlignmentTime(String operatorId, int taskIndex, long latencyNano){
-		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setAlignmentTime(latencyNano);
-	}
-
-	public String frontEndToString(){
+	public String qTimeToString(){
 		StringBuilder result = new StringBuilder();
 		for(String operatorId : operatorList){
-			result.append(operatorMap.get(operatorId).frontEndToString()).append("|");
-		}
-		result.deleteCharAt(result.lastIndexOf("|"));
-		return result.toString();
-	}
-
-	public String kToString(){
-		StringBuilder result = new StringBuilder();
-		for(String operatorId : operatorList){
-			result.append(operatorMap.get(operatorId).getk()).append("|");
-		}
-		result.deleteCharAt(result.lastIndexOf("|"));
-		return result.toString();
-	}
-
-	public String alphaToString(){
-		StringBuilder result = new StringBuilder();
-		for(String operatorId : operatorList){
-			result.append(operatorMap.get(operatorId).getAlpha()).append("|");
-		}
-		result.deleteCharAt(result.lastIndexOf("|"));
-		return result.toString();
-	}
-
-	public String betaToString(){
-		StringBuilder result = new StringBuilder();
-		for(String operatorId : operatorList){
-			result.append(operatorMap.get(operatorId).getBeta()).append("|");
+			result.append(operatorMap.get(operatorId).qtimeString()).append("|");
 		}
 		result.deleteCharAt(result.lastIndexOf("|"));
 		return result.toString();
@@ -178,30 +130,64 @@ public class VScalingMetrics {
 		return result.toString();
 	}
 
-	public void setStateSizesState(String operatorId, int taskIndex, double size){
-		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().setStateSize(size);
+	public void setAccessTime(String operatorId, int taskIndex, String stateName, double accessTime){
+		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric(stateName).setAccessTime(accessTime);
+	}
+
+	public void setTupleLatency(String operatorId, int taskIndex, double latency){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setTupleLatency(latency);
+	}
+
+	public void setNumRecordsIn(String operatorId, int taskIndex, long recordsIn){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setRecordsIn(recordsIn);
+	}
+
+	public void setNumRecordsOut(String operatorId, int taskIndex, long recordsOut){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setRecordsOut(recordsOut);
+	}
+
+	public void setAlignmentTime(String operatorId, int taskIndex, long latencyNano){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setAlignmentTime(latencyNano);
+	}
+
+	public void setEndToEndLatency(String operatorId, int taskIndex, double avgLatency){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setEndToEndLatency(avgLatency);
+	}
+
+	public String ksToString(){
+		StringBuilder result = new StringBuilder();
+		for(String operatorId : operatorList){
+			result.append(operatorMap.get(operatorId).ksString()).append("|");
+		}
+		result.deleteCharAt(result.lastIndexOf("|"));
+		return result.toString();
+	}
+
+	public String bsToString(){
+		StringBuilder result = new StringBuilder();
+		for(String operatorId : operatorList){
+			result.append(operatorMap.get(operatorId).bsString()).append("|");
+		}
+		result.deleteCharAt(result.lastIndexOf("|"));
+		return result.toString();
+	}
+
+	public void setStateSizesState(String operatorId, int taskIndex, String stateName, double size){
+		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric(stateName).setStateSize(size);
 	}
 
 	public void setStateSizesCounter(String operatorId, int taskIndex, String stateName, long counter){
-		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().setAccessCounter(counter);
+		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric(stateName).setAccessCounter(counter);
 	}
 
 	// Preprocess information, such as state access time, state size, queueing time
 	public void preprocess(){
-		updateStateSizesTask();
 		updateStateTime();
-		updatek();
-		updateFrontEndTime();
-		updateBacklog();
-		training();
-//		updateAlignmentTime();
-//		updateEndToEndLatency();
-	}
-
-	private void updateStateSizesTask(){
-		for(String operatorId : operatorList){
-			operatorMap.get(operatorId).updateStateSize();
-		}
+		updateStateSizesTask();
+		updateQueuingTime();
+		updateKandB();
+		updateAlignmentTime();
+		updateEndToEndLatency();
 	}
 
 	private void updateStateTime(){
@@ -210,41 +196,47 @@ public class VScalingMetrics {
 		}
 	}
 
-	private void updatek(){
+	private void updateStateSizesTask(){
 		for(String operatorId : operatorList){
-			operatorMap.get(operatorId).updatek();
+			operatorMap.get(operatorId).updateTaskStateSize();
 		}
 	}
 
-	private void updateFrontEndTime(){
+	public void updateKandB(){
 		for(String operatorId : operatorList){
-			operatorMap.get(operatorId).updateFrontEndTime();
+			operatorMap.get(operatorId).updateKandB();
 		}
 	}
 
-	private void updateBacklog(){
+	private void updateQueuingTime(){
 		for(String operatorId : operatorList){
-			operatorMap.get(operatorId).updateBacklog();
+			operatorMap.get(operatorId).updateQueuingTime();
 		}
 	}
 
-	public void training(){
-		for(String operatorId : operatorList){
-			operatorMap.get(operatorId).training();
+	private void updateAlignmentTime(){
+		for(String operatorId : operatorFullList){
+			operatorFullMap.get(operatorId).updateAlignmentTime();
+		}
+	}
+
+	private void updateEndToEndLatency(){
+		for(String operatorId : operatorFullList){
+			operatorFullMap.get(operatorId).updateEndToEndLatency();
 		}
 	}
 
 	public String stateSizesTaskToString(){
 		StringBuilder result = new StringBuilder();
 		for(String operatorId : operatorList){
-			result.append(operatorMap.get(operatorId).getStateSize()).append("|");
+			result.append(operatorMap.get(operatorId).stateSizeToString()).append("|");
 		}
 		result.deleteCharAt(result.lastIndexOf("|"));
 		return result.toString();
 	}
 
 	public void setItemFrequency(String operatorId, int taskIndex, String stateName, ArrayList<Long> frequency){
-		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().setItemFrequency(frequency);
+		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric(stateName).setItemFrequency(frequency);
 	}
 
 	public String itemFrequencyToString(){
@@ -295,21 +287,6 @@ public class VScalingMetrics {
 
 	public void addSlotInfo(String slotID, SlotMetrics slot){
 		slotsMap.put(slotID, slot);
-	}
-
-	public void addSlotTMInfo(int instanceID, SlotMetrics slot){
-		List<SlotMetrics> slots = slotTMMap.get(instanceID);
-		if(slots == null){
-			slots = new ArrayList<>();
-		}
-		if(!slots.contains(slot)) {
-			slots.add(slot);
-			slotTMMap.put(instanceID, slots);
-		}
-	}
-
-	public Map<Integer, List<SlotMetrics>> getSlotTMMap(){
-		return slotTMMap;
 	}
 
 	public SlotMetrics getSlot(String slotID){

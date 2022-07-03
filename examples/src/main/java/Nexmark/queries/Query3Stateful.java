@@ -66,7 +66,7 @@ public static void main(String[] args) throws Exception {
     // enable latency tracking
 //    env.getConfig().setLatencyTrackingInterval(1000);
 
-    env.enableCheckpointing(10000);
+    env.enableCheckpointing(1000);
     env.getConfig().setAutoWatermarkInterval(1);
 
     env.disableOperatorChaining();
@@ -236,27 +236,7 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
             Tuple3<String, String, String> match = personMap.get(auction.seller);
 //            out.collect(new Tuple4<>(match.f0, match.f1, match.f1, auction.seller));
         }
-
-//        System.out.println("ts: " + startTime + " endToEnd Latency1: " + ((System.nanoTime() - start - subStruct) / 1000000.0));
-//        out.collect(new Tuple4<>(auction.description, auction.itemName, auction.itemName, auction.id));
-//        for (long i = 0; i < readCounter; i ++){
-//            long key = new Random().nextInt(writeCounter);
-//            if(personMap.contains(key)){
-//                Tuple3<String, String, String> match = personMap.get(key);
-//                out.collect(new Tuple4<>(match.f0, match.f1, match.f1, auction.id));
-//            }
-//        }
-
-//        if(taskIndex == 0)
-            delay(1_000_000);
         out.collect(new Tuple4<>(auction.itemName, auction.itemName, auction.itemName, auction.seller));
-//          delay(250_000);
-
-//        if(taskIndex == 2)
-//            delay(250_000);
-//        else
-//            delay(1_000_000);
-//        delay(500_000);
 //        long start = System.nanoTime();
 //        System.out.println("flap map 1: " + ((System.nanoTime() - start) / 1000000.0));
 //        else {
@@ -286,12 +266,6 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
             personMap.put(person.id, new Tuple3<>(person.name, person.city, extra));
         }
 
-//        if(!personMap.contains(1L)){
-//            for(long i = 0; i < writeCounter; i ++){
-//                personMap.put(i, new Tuple3<>(person.name, person.city, person.extra));
-//            }
-//        }
-//        System.out.println("flap map 2: " + ((System.nanoTime() - start) / 1000000.0));
 
 //        // check if person has a match in the auction state
 //        if (auctionMap.containsKey(person.id)) {
@@ -303,8 +277,6 @@ private static final class JoinPersonsWithAuctions extends RichCoFlatMapFunction
 //        }
         //delay 0.1ms
 //        delay(100_000);
-//        if(taskIndex == 0)
-            delay(1_000_000);
     }
 
     public void metricsDump() throws Exception {

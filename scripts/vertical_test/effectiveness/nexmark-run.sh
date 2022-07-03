@@ -15,35 +15,44 @@ init() {
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
   readonly SAVEPOINT_PATH="/home/drg/projects/work3/temp/"
-  if [[ "$2" = "q3" ]]; then
+  if [[ "$1" = "q3" ]]; then
     JOB="Nexmark.queries.Query3Stateful"
-  elif [[ "$2" = "q3window" ]]; then
+  elif [[ "$1" = "q3window" ]]; then
     JOB="Nexmark.queries.Query3StatefulWindow"
-  elif [[ "$2" = "q5" ]]; then
+  elif [[ "$1" = "q5" ]]; then
     JOB="Nexmark.queries.Query5Keyed"
-  elif [[ "$2" = "q8" ]]; then
+  elif [[ "$1" = "q8" ]]; then
     JOB="Nexmark.queries.Query8Keyed"
-  elif [[ "$2" = "q20" ]]; then
+  elif [[ "$1" = "q20" ]]; then
     JOB="Nexmark.queries.Query20"
-  elif [[ "$2" = "q4" ]]; then
+  elif [[ "$1" = "q4" ]]; then
     JOB="Nexmark.queries.Query4"
   fi
-  EXP_NAME="nexmark-$2"
+  EXP_NAME="nexmark-$1"
 
-#  partitions=128
-#  parallelism=1
-  AUCTION_S=2000
+  AUCTION_S=0
   PERSON_S=300
-  BID_S=1750
-  STATE_SIZE=800000
-  KEY_SIZE=100000
-  AUCTION_P=2
-  PERSON_P=2
-  BID_P=2
-  JOIN_P=4
-  runtime=1000
-  blockCacheSize=$1
-  simpleTest=$3
+  BID_S=$4
+  STATE_SIZE=100000
+  KEY_SIZE=50000
+
+  PP=4
+  AUCTION_P=${PP}
+  PERSON_P=${PP}
+  BID_P=${PP}
+  JOIN_P=${PP}
+  WIN_P=${PP}
+
+  runtime=1500
+  totalCachePerTM=2048
+  # Controller="BlankController"
+  # Group="true"
+  # Controller="ElasticMemoryManager"
+  # Group="false"
+  Controller=$2
+  Group=$3
+  SUB_DIR=$Controller+$Group
+
   ROCKSDB_DIR="/home/drg/projects/work3/flink/rocksdb-storage"
   ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
   ROCKSDB_CHECKPOINT=${ROCKSDB_DIR}"/checkpoint/"
@@ -52,30 +61,31 @@ init() {
   DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}"
 #  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/queue_delay"
 #  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/state_size/${readCount}"
-  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
-  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+#  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
+#  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 }
 
 # config block cache size
 function configApp() {
-    echo "INFO: config app block cache size: ${blockCacheSize}m"
-#    sed -ri "s|(state.backend.rocksdb.block.cache-size: )[0-9]*|state.backend.rocksdb.block.cache-size: $blockCacheSize|" ${FLINK_DIR}conf/flink-conf.yaml
-#    sed -ri "s|(taskmanager.memory.managed.fraction: 0.)[0-9]*|taskmanager.memory.managed.fraction: 0.$blockCacheSize|" ${FLINK_DIR}conf/flink-conf.yaml
-    sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $blockCacheSize|" ${FLINK_DIR}conf/flink-conf.yaml
-    sed -i "s/^\(trisk.simple_test: \)\(true\|false\)/\1${simpleTest}/"  ${FLINK_DIR}conf/flink-conf.yaml
+    echo "INFO: config app block cache size: ${totalCachePerTM}m"
+#    sed -ri "s|(state.backend.rocksdb.block.cache-size: )[0-9]*|state.backend.rocksdb.block.cache-size: $totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
+#    sed -ri "s|(taskmanager.memory.managed.fraction: 0.)[0-9]*|taskmanager.memory.managed.fraction: 0.$totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
+    sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
+#    sed -i "s/^\(trisk.simple_test: \)\(true\|false\)/\1${simpleTest}/"  ${FLINK_DIR}conf/flink-conf.yaml
+    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
 }
 
 function mvRocksdbLog() {
     if [[ ! -d ${DATA_DIR} ]]; then
             mkdir ${DATA_DIR}
     fi
-    mkdir ${DATA_DIR}/${blockCacheSize}
-    if [[ -d ${DATA_DIR}/${blockCacheSize}/${simpleTest} ]]; then
+    mkdir ${DATA_DIR}/${BID_S}
+    if [[ -d ${DATA_DIR}/${BID_S}/${SUB_DIR} ]]; then
             # shellcheck disable=SC2115
-            rm -rf ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+            rm -rf ${DATA_DIR}/${BID_S}/${SUB_DIR}
     fi
-    mkdir ${DATA_DIR}/${blockCacheSize}/${simpleTest}
-    mv ${ROCKSDB_LOG_DIR}* ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+    mkdir ${DATA_DIR}/${BID_S}/${SUB_DIR}
+#    mv ${ROCKSDB_LOG_DIR}* ${DATA_DIR}/${totalCachePerTM}/${simpleTest}
 #    for entry in ${ROCKSDB_LOG_DIR}*
 #    do
 #      echo "$entry"
@@ -101,8 +111,8 @@ function cleanEnv() {
 #      rm -rf ${FLINK_DIR}${EXP_NAME}
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
-  mv ${FLINK_DIR}log/* ${DATA_DIR}/${blockCacheSize}/${simpleTest}
-  mv ${LATENCY_DIR}* ${DATA_DIR}/${blockCacheSize}/${simpleTest}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${BID_S}/${SUB_DIR}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${BID_S}/${SUB_DIR}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
@@ -131,9 +141,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} &
+  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} &
 }
 
 function runGenerator() {
@@ -180,6 +190,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3
+init $1 $2 $3 $4
 run_one_exp
 #test

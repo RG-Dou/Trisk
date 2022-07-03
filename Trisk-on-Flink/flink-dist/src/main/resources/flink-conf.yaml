@@ -55,8 +55,9 @@ taskmanager.memory.process.size: 10240m
 
 # The number of task slots that each TaskManager offers. Each slot runs one parallel pipeline.
 
-taskmanager.numberOfTaskSlots: 20
+taskmanager.numberOfTaskSlots: 8
 
+cluster.evenly-spread-out-slots: true
 # The parallelism used for programs that did not specify and other parallelism.
 
 parallelism.default: 1
@@ -256,7 +257,7 @@ jobmanager.execution.failover-strategy: region
 # Trisk
 #==============================================================================
 
-trisk.controller: DummyController
+trisk.controller: ElasticMemoryManager
 
 trisk.reconfig.operator.name: Splitter FlatMap
 trisk.reconfig.interval: 0

@@ -44,34 +44,51 @@ import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Random;
+
 public class Query4 {
 
     private static final Logger logger  = LoggerFactory.getLogger(Query3Stateful.class);
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {;
 
         // Checking input parameters
         final ParameterTool params = ParameterTool.fromArgs(args);
 
         // set up the execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(20);
+        env.enableCheckpointing(1000);
         env.getConfig().setAutoWatermarkInterval(1);
         env.disableOperatorChaining();
 
-        final int auctionSrcRate = params.getInt("auction-srcRate", 20000);
-        final int bidSrcRate = params.getInt("bid-srcRate", 10000);
-        final long stateSize = params.getLong("state-size", 20);
+        final int auctionSrcRate = params.getInt("auction-srcRate", 0);
+        final int bidSrcRate = params.getInt("bid-srcRate", 1000);
+        final long stateSize = params.getLong("state-size", 1_000_000);
+        final long keySize = params.getLong("keys", 10000);
+        final double skewness = params.getDouble("skewness", 1.0);
+        int warmUp = 6*60*1000;
 
-        DataStream<Auction> auctions = env.addSource(new AuctionSourceFunction(auctionSrcRate, stateSize))
+        final boolean groupAll = params.getBoolean("group-all", false);
+        String groupJoin = "join", groupWin = "win";
+        if (groupAll){
+            groupJoin = "unified";
+            groupWin = "unified";
+        }
+
+        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, keySize, 0, warmUp);
+        auctionSrc.setSkewField("Warmup");
+        BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keySize, skewness, warmUp);
+        bidSrc.setSkewField("Auction");
+
+        DataStream<Auction> auctions = env.addSource(auctionSrc)
                 .name("Custom Source: Auctions")
-                .setParallelism(params.getInt("p-auction-source", 1)).slotSharingGroup("source")
-                .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).slotSharingGroup("source");
+                .setParallelism(params.getInt("p-auction-source", 1)).slotSharingGroup(groupJoin)
+                .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).slotSharingGroup(groupJoin);
 
-        DataStream<Bid> bids = env.addSource(new BidSourceFunction(bidSrcRate))
+        DataStream<Bid> bids = env.addSource(bidSrc)
                 .name("Custom Source: Bids")
-                .setParallelism(params.getInt("p-bid-source", 1)).slotSharingGroup("source")
-                .assignTimestampsAndWatermarks(new BidTimestampAssigner()).slotSharingGroup("source");
+                .setParallelism(params.getInt("p-bid-source", 1)).slotSharingGroup(groupJoin)
+                .assignTimestampsAndWatermarks(new BidTimestampAssigner()).slotSharingGroup(groupJoin);
 
         // SELECT
         //      Q.category
@@ -101,7 +118,7 @@ public class Query4 {
                 });
 
         DataStream<Tuple2<Long, Long>> joined = keyedAuctions.connect(keyedBids)
-                .flatMap(new JoinBidsWithAuctions()).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup("join");
+                .flatMap(new JoinBidsWithAuctions()).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup(groupJoin);
 
 
         DataStream<Double> window = joined.keyBy(new KeySelector<Tuple2<Long, Long>, Long>() {
@@ -114,11 +131,11 @@ public class Query4 {
                 .trigger(new DummyTrigger())
                 .aggregate(new AvgAgg())
                 .name("Sliding Window")
-                .setParallelism(params.getInt("p-window", 1)).slotSharingGroup("sink");
+                .setParallelism(params.getInt("p-window", 1)).slotSharingGroup(groupWin);
 
         GenericTypeInfo<Object> objectTypeInfo = new GenericTypeInfo<>(Object.class);
         window.transform("Sink", objectTypeInfo, new DummyLatencyCountingSinkOutput<>(logger))
-                .setParallelism(params.getInt("p-sink", 1)).slotSharingGroup("sink");
+                .setParallelism(params.getInt("p-window", 1)).slotSharingGroup(groupWin);
 
         // execute program
         env.execute("Nexmark Query");
@@ -142,33 +159,39 @@ public class Query4 {
         @Override
         public void flatMap1(Auction auction, Collector<Tuple2<Long, Long>> out) throws Exception {
             Tuple6<Long, Long, Long, Long, Long, String> oldValue = auctionMsg.value();
+            Tuple2<Long, Long> maxPrice = new Tuple2<>(auction.category, -1L);
             if (oldValue == null) {
                 Tuple6<Long, Long, Long, Long, Long, String> tuple =
                         new Tuple6<>(auction.id, auction.category, auction.initialBid, auction.dateTime, auction.expires, auction.extra);
                 auctionMsg.update(tuple);
             } else if (auction.dateTime > oldValue.f4){
                 //the last auction is closed, output the max price and category.
-                Tuple2<Long, Long> maxPrice = new Tuple2<>(oldValue.f1, oldValue.f2);
-                out.collect(maxPrice);
+                maxPrice.f1 = oldValue.f2;
 
                 Tuple6<Long, Long, Long, Long, Long, String> tuple =
                         new Tuple6<>(auction.id, auction.category, auction.initialBid, auction.dateTime, auction.expires, auction.extra);
                 auctionMsg.update(tuple);
             }
+            out.collect(maxPrice);
         }
 
         @Override
         public void flatMap2(Bid bid, Collector<Tuple2<Long, Long>> out) throws Exception {
             Tuple6<Long, Long, Long, Long, Long, String> auction = auctionMsg.value();
+//            delay(100_000);
             if(auction != null){
+                Tuple2<Long, Long> maxPrice = new Tuple2<>(auction.f1, -1L);
                 if(bid.dateTime > auction.f3 && bid.dateTime < auction.f4 && bid.price > auction.f2){
                     auction.f2 = bid.price;
                     auctionMsg.update(auction);
                 } else if (bid.dateTime > auction.f4){
-                    Tuple2<Long, Long> maxPrice = new Tuple2<>(auction.f1, auction.f2);
-                    out.collect(maxPrice);
+                    maxPrice.f1 = auction.f2;
                     auctionMsg.clear();
                 }
+                out.collect(maxPrice);
+            } else {
+                if(bid.auction == 1)
+                    System.out.println("not found 1");
             }
         }
 
@@ -187,6 +210,8 @@ public class Query4 {
 
         @Override
         public Tuple2<Long, Long> add(Tuple2<Long, Long> value, Tuple2<Long, Long> accumulator) {
+            if(value.f1 < 0)
+                return new Tuple2<>(accumulator.f0 + 0, accumulator.f1 + 0L);
             return new Tuple2<>(accumulator.f0 + value.f1, accumulator.f1 + 1L);
         }
 

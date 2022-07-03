@@ -244,6 +244,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				String ratesLine = jobVertexId + ","
 					+ workerName + "-" + instanceId + ","
 					+ " observedProcessingRate: " + observedProcessingRate + ","
+					+ " trueProcessingRate: " + trueProcessingRate + ","
 					+ " avgProcessingTime: " + avgProcessingTime + ","
 					+ " endToEndLantecy: " + tupleLatency + ","
 					+ " avgUsefulTime: " + avgUsefulTime + ","
