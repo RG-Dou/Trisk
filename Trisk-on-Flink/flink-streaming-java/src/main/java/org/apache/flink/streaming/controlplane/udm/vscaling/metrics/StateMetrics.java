@@ -48,6 +48,14 @@ public class StateMetrics {
 		return stateSize;
 	}
 
+	public long getTotalItems(){
+		long num = 0;
+		for (int i = 1; i < itemFrequency.size(); i = i + 2){
+			num += itemFrequency.get(i);
+		}
+		return num;
+	}
+
 	public void updateStateTime(long recordsIn){
 		// Calculate the average time of one access
 		accessTime = stateTimeStats.f2 / (stateTimeStats.f1 - stateTimeStats.f0);

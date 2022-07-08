@@ -34,7 +34,7 @@ Minimize The Maximum Latency
 
 global N, task_num, task_instances, M
 global ratio
-BASE_M = 50
+BASE_M = 1024
 
 
 # calculate the TC
@@ -43,8 +43,10 @@ def cal_Tc(frequencies, item_capacity):
 
     def che_approximation(Tc):
         sum = 0
-        for i in frequencies:
-            sum += 1 - math.exp(-1 * i * Tc)
+        # for i in frequencies:
+        #     sum += 1 - math.exp(-1 * i * Tc)
+        for i in range (0, len(frequencies) - 1, 2):
+            sum += (1 - math.exp(-1 * frequencies[i] * Tc)) * frequencies[i+1]
         return sum - C
 
     TC = fsolve(che_approximation, np.zeros(1, dtype=np.int16))
@@ -54,12 +56,16 @@ def cal_Tc(frequencies, item_capacity):
 # calculate the hit ratio
 def cal_hit_ratio(frequencies, total_count, Tc):
     sum = 0.0
-    for i in frequencies:
-        sum += i * 1.0 / total_count * (1 - math.exp(-1 * i * Tc))
+    # for i in frequencies:
+    #     sum += i * 1.0 / total_count * (1 - math.exp(-1 * i * Tc))
+    for i in range (0, len(frequencies) - 1, 2):
+        frequency = frequencies[i]
+        counter = frequencies[i+1]
+        sum += (frequency * 1.0 / total_count * (1 - math.exp(-1 * frequency * Tc))) * counter
     return sum
 
 
-def object_function(t, k, backlog, alpha, beta, item_frequencies, state_sizes):
+def object_function(t, k, backlog, alpha, beta, item_frequencies, total_item, state_sizes, arrival_rate):
 
     def fun(x):
         sum = 0.0
@@ -68,13 +74,16 @@ def object_function(t, k, backlog, alpha, beta, item_frequencies, state_sizes):
             Ni = task_num[i]
             latencies = []
             for j in range(0, Ni):
-                total_count = np.sum(item_frequencies[i][j])
+                # total_count = np.sum(item_frequencies[i][j])
+                total_count = total_item[i][j]
                 Tc = cal_Tc(item_frequencies[i][j], x[x_index] * ratio/state_sizes[i])
                 x_index += 1
 
                 state_access = (1 - cal_hit_ratio(item_frequencies[i][j], total_count, Tc)) * alpha[i] + beta[i]
 
                 latency = (backlog[i][j] + 1) * (t[i][j] + state_access * k[i])
+                # u = 1/(t[i][j] + state_access * k[i])
+                # latency = 1 / (u - arrival_rate[i][j])
                 latencies.append(latency)
             sum += np.max(latencies)
         # print(x)
@@ -171,25 +180,28 @@ def get_item_capacity(memory_size, state_size):
     return result
 
 
-def get_hit_ratio(capacity, frequency):
+def get_hit_ratio(capacity, frequency, total_items):
     result = []
     for i in range(0, N):
         result.append([])
         for j in range(0, task_num[i]):
             Tc = cal_Tc(frequency[i][j], capacity[i][j])
-            total_count = np.sum(frequency[i][j])
+            # total_count = np.sum(frequency[i][j])
+            total_count = total_items[i][j]
             hit_ratio = cal_hit_ratio(frequency[i][j], total_count, Tc)
             result[i].append(hit_ratio)
     return result
 
 
-def get_latency(t, k, backlog, alpha, beta, hit_ratios):
+def get_latency(t, k, backlog, alpha, beta, hit_ratios, arrival_rate):
     result = []
     for i in range(0, N):
         result.append([])
         for j in range(0, task_num[i]):
             access_time = alpha[i] * (1 - hit_ratios[i][j]) + beta[i]
-            latency = (backlog[i][j] + 1) * (t[i][j] + access_time * k[i])
+            # latency = (backlog[i][j] + 1) * (t[i][j] + access_time * k[i])
+            u = t[i][j] + access_time * k[i]
+            latency = 1 / (1 / u - arrival_rate[i][j])
             result[i].append(latency)
     return result
 
@@ -209,7 +221,7 @@ def print_basic_info():
     log.info(parameter_info)
 
 
-def print_result(m, state_size, frequencies, t, k, backlog, alpha, beta, end_to_end_latency):
+def print_result(m, state_size, frequencies, total_item, t, k, backlog, alpha, beta, arrival_rate, end_to_end_latency):
     m_matrix = list_to_matrix(m)
     parameter_info = "\n  -------------------------Result to Check-------------------------\n"
 
@@ -224,7 +236,7 @@ def print_result(m, state_size, frequencies, t, k, backlog, alpha, beta, end_to_
     parameter_info += metrix_to_2Dstring(item_capacity) + "\n"
 
     parameter_info += "  hit ratio:\n"
-    hit_ratio = get_hit_ratio(item_capacity, frequencies)
+    hit_ratio = get_hit_ratio(item_capacity, frequencies, total_item)
     parameter_info += metrix_to_2Dstring(hit_ratio) + "\n"
 
     parameter_info += "  alpha:\n"
@@ -243,7 +255,7 @@ def print_result(m, state_size, frequencies, t, k, backlog, alpha, beta, end_to_
     parameter_info += metrix_to_2Dstring(backlog) + "\n"
 
     parameter_info += "  latency per task:\n"
-    latency = get_latency(t, k, backlog, alpha, beta, hit_ratio)
+    latency = get_latency(t, k, backlog, alpha, beta, hit_ratio, arrival_rate)
     parameter_info += metrix_to_2Dstring(latency) + "\n"
 
     parameter_info += "  maximum latency per operator:\n"
@@ -257,14 +269,39 @@ def print_result(m, state_size, frequencies, t, k, backlog, alpha, beta, end_to_
     log.info(parameter_info)
 
 
-def init_x0(length, value):
-    array = []
-    for i in range(length):
-        array.append(int(value / length))
-    return array
+# def init_x0(length, value):
+#     array = []
+#     for i in range(length):
+#         array.append(int(value / length))
+#     return array
 
 
-def min_max_latency_main(parameters, t, k, backlog, alpha, beta, state_sizes, item_frequencies):
+def init_x0(state_sizes, total_item, backlog, arrival_rate, total_memory):
+    array, total_size, operator_sizes, task_sizes = [], 0, [], []
+    for i in range(0, N):
+        operator_size = 0
+        for j in range(0, task_num[i]):
+            size = total_item[i][j] * state_sizes[i]
+            operator_size += size
+            total_size += size
+            task_sizes.append(int(size))
+        operator_sizes.append(operator_size)
+
+    for i in range(0, N):
+        operator_sizes[i] = operator_sizes[i] * 1.0/ total_size * total_memory
+    for i in range(0, N):
+        operator_memory = operator_sizes[i]
+        total_backlog = 0
+        for j in range(0, task_num[i]):
+            total_backlog += backlog[i][j]
+        task_init = []
+        for j in range(0, task_num[i]):
+            task_init.append(int(backlog[i][j] * 1.0 / total_backlog * operator_memory))
+        array.append(task_init)
+    return array, task_sizes
+
+
+def min_max_latency_main(parameters, t, k, backlog, alpha, beta, state_sizes, item_frequencies, total_item, arrival_rate):
     global N, task_num, task_instances, M, ratio
     N = parameters[0]
     task_num = parameters[1]
@@ -276,15 +313,17 @@ def min_max_latency_main(parameters, t, k, backlog, alpha, beta, state_sizes, it
 
     # state_sizes_task = get_state_size_per_task(item_frequencies, state_sizes)
 
-    fun = object_function(t, k, backlog, alpha, beta, item_frequencies, state_sizes)
+    fun = object_function(t, k, backlog, alpha, beta, item_frequencies, total_item, state_sizes, arrival_rate)
     con = constraint()
+
+    # x0_array = init_x0(np.sum(task_num), M)
+    x0_array, task_sizes = init_x0(state_sizes, total_item, backlog, arrival_rate, M)
+    x0 = np.array(x0_array)
 
     b, bnds = (0, M), []
     for i in range(0, np.sum(task_num)):
-        bnds.append(b)
-
-    x0_array = init_x0(np.sum(task_num), M)
-    x0 = np.array(x0_array)
+        c = [0, task_sizes[i]]
+        bnds.append(tuple(c))
 
     res2 = minimize(fun, x0, method='SLSQP', bounds=tuple(bnds), constraints=con)
 
@@ -294,7 +333,7 @@ def min_max_latency_main(parameters, t, k, backlog, alpha, beta, state_sizes, it
 
     results = [i*ratio for i in res2.x]
 
-    print_result(results, state_sizes, item_frequencies, t, k, backlog, alpha, beta, res2.fun)
+    print_result(results, state_sizes, item_frequencies, total_item, t, k, backlog, alpha, beta, arrival_rate, res2.fun)
     return results
     # print("xOpt = {}".format(res2.x))  #
     # print("min f(x) = {:.4f}".format(res2.fun))  #
@@ -354,16 +393,26 @@ def parse_state(raw_data):
 
 
 def parse_item_frequency(raw_data):
-    result_list = []
+    frequency, total_item = [], []
     for task_str in raw_data.split("|"):
-        task_list = []
+        task_frequency, task_total = [], []
         for items in task_str.split(";"):
-            item_list = []
+            item_list, total  = [], 0
             for item in items.split("-"):
                 item_list.append(int(item))
-            task_list.append(item_list)
-        result_list.append(task_list)
-    return result_list
+            #      item_list_count.append(int(item))
+            # for i in range (0, len(item_list_count) - 1, 2):
+            #     for j in range(item_list_count[i+1]):
+            #         item_list.append(item_list_count[i])
+
+            for i in range (0, len(item_list) - 1, 2):
+                total += item_list[i] * item_list[i+1]
+
+            task_frequency.append(item_list)
+            task_total.append(total)
+        frequency.append(task_frequency)
+        total_item.append(task_total)
+    return frequency, total_item
 
 
 def load_basic_info():
@@ -400,9 +449,10 @@ def load_metrics():
     beta = parse_operator_float(config.get("data", "beta"))
     state_sizes = parse_operator_float(config.get("data", "state.size"))
     # state_sizes = preprocess(state_sizes_raw)
-    item_frequency = parse_item_frequency(config.get("data", "item.frequency"))
+    item_frequency, total_item = parse_item_frequency(config.get("data", "item.frequency"))
+    arrival_rate = parse_task(config.get("data", "arrivalRate"))
     epoch = config.getint("data", "epoch")
-    return t, k, backlog, alpha, beta, state_sizes, item_frequency, epoch
+    return t, k, backlog, alpha, beta, state_sizes, item_frequency, total_item, arrival_rate, epoch
 
 
 def write_result(epoch, results):
@@ -415,6 +465,6 @@ def write_result(epoch, results):
 
 if __name__ == '__main__':
     parameters = load_basic_info()
-    t, k, backlog, alpha, beta, state_sizes, item_frequencies, epoch = load_metrics()
-    results = min_max_latency_main(parameters, t, k, backlog, alpha, beta, state_sizes, item_frequencies)
+    t, k, backlog, alpha, beta, state_sizes, item_frequencies, total_item, arrival_rate, epoch = load_metrics()
+    results = min_max_latency_main(parameters, t, k, backlog, alpha, beta, state_sizes, item_frequencies, total_item, arrival_rate)
     write_result(epoch, results)

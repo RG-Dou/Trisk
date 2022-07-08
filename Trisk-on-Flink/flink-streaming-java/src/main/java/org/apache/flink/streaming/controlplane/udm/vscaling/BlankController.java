@@ -35,9 +35,11 @@ public class BlankController extends AbstractController {
 	private final String ROCKSDB_LOG_DIR = "state.backend.rocksdb.log.dir";
 
 	private final String SIMPLE_TEST = "trisk.simple_test";
+	private final String DECAY_RATE = "trisk.decay.rate";
 
 	private final Long metricsInterval;
 	private boolean simpleTest;
+	private final double decayRate;
 
 	private ReentrantLock lock = new ReentrantLock();
 
@@ -47,6 +49,8 @@ public class BlankController extends AbstractController {
 		metricsInterval = configuration.getLong(METRICS_INTERVAL, 1000);
 		long totalMem = configuration.getLong(TM_MANAGED_MEMORY, 50);
 		metrics = new VScalingMetrics(totalMem);
+		decayRate = configuration.getDouble(DECAY_RATE, 0.8);
+		metrics.setDecayRate(decayRate);
 		String rocksdbLogDir = configuration.getString(ROCKSDB_LOG_DIR, "");
 		mRetriever = new RestfulMetricsRetriever(configuration.getString(REST_SERVER_IP, "localhost"), configuration.getInteger(REST_SERVER_PORT, 8081), jobName, metrics, rocksdbLogDir);
 		simpleTest = configuration.getBoolean(SIMPLE_TEST, false);
@@ -226,11 +230,12 @@ public class BlankController extends AbstractController {
 					double queuingDelay = task.getQueuingTime();
 					double serviceTime = task.getServiceTime();
 					double t = task.getFrontEndTime();
+					double rate = task.getArrivalRate();
 					double backlog = task.getBacklog();
 					StateMetrics state = task.getStateMetric();
 					double stateTime = state.getAccessTime();
 					double hitRatio = state.getHitRatio();
-					System.out.println("MetricsReport:" + System.currentTimeMillis() + ", task:" + i + ", queuingDelay:" + queuingDelay +
+					System.out.println("MetricsReport:" + System.currentTimeMillis() + ", task:" + i + ", queuingDelay:" + queuingDelay + ", arrivalRate:" + rate +
 						", serviceTime:" + serviceTime + ", frontEndTime:" + t + ", backlog:" + backlog +
 						", stateTime:" + stateTime + ", hitRatio:" + hitRatio);
 				}

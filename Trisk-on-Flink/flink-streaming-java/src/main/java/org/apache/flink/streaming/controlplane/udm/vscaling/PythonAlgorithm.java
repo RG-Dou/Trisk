@@ -108,7 +108,7 @@ public class PythonAlgorithm{
 			for(int taskIndex = 0; taskIndex < operator.getNumTasks(); taskIndex++){
 				TaskMetrics task = operator.getTaskMetrics(taskIndex);
 				double stateSize = task.getStateMetric().getStateSize();
-				long totalItems = task.getStateMetric().getItemFrequency().size();
+				long totalItems = task.getStateMetric().getTotalItems();
 
 				long maxSize = (long) (totalItems * stateSize);
 				totalMax += maxSize;
@@ -146,6 +146,7 @@ public class PythonAlgorithm{
 			"frontEndTime=" + metrics.frontEndToString() + "\n" +
 			"k=" + metrics.kToString() + "\n" +
 			"backlog=" + metrics.backlogToString() + "\n" +
+			"arrivalRate=" + metrics.arrivalRateToString() + "\n" +
 			"alpha=" + metrics.alphaToString() + "\n" +
 			"beta=" + metrics.betaToString() + "\n" +
 			"state.size=" + metrics.stateSizesTaskToString() + "\n" +

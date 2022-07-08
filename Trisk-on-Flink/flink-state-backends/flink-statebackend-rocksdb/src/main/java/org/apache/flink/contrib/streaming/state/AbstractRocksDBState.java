@@ -291,11 +291,10 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		}
 	}
 
-	public static class ItemFrequencyGauge<K> implements Gauge<Collection<AtomicLong>> {
-//	public static class ItemFrequencyGauge<K> implements Gauge<Map<Integer, Map<K, Map<Object, AtomicLong>>>> {
+	public static class ItemFrequencyGauge<K> implements Gauge<Collection<Long>> {
 
 		private final Map<Integer, Map<K, Map<Object, AtomicLong>>> itemFrequency = new HashMap<>();
-//		private final Map<byte[], AtomicLong> itemFrequency = new HashMap<>();
+		private final Map<Long, Long> outputs = new HashMap<>();
 
 		public void putItem(Integer groupId, K key, Object userKey) {
 			if (userKey == null)
@@ -327,20 +326,28 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 				keyAndUserKey.put(key, ukFreq);
 				itemFrequency.put(groupId, keyAndUserKey);
 			}
-//			if(itemFrequency.containsKey(key)){
-//				itemFrequency.get(key).addAndGet(1);
-//			} else {
-//				itemFrequency.put(key, new AtomicLong(1));
-//			}
+			long counter = count.get();
+			Long counterCount = outputs.get(counter);
+			if(counterCount == null)
+				counterCount = 1L;
+			else counterCount += 1;
+			outputs.put(counter, counterCount);
+
+			counter = counter - 1;
+			if(counter == 0)
+				return;
+			counterCount = outputs.get(counter);
+			counterCount -= 1;
+			outputs.put(counter, counterCount);
 		}
 
 		@Override
-		public Collection<AtomicLong> getValue() {
-//			return itemFrequency;
-			Collection<AtomicLong> results = new ArrayList<>();
-			for(Map.Entry<Integer, Map<K, Map<Object, AtomicLong>>> entry1 : itemFrequency.entrySet()){
-				for(Map.Entry<K, Map<Object, AtomicLong>> entry2 : entry1.getValue().entrySet()){
-					results.addAll(entry2.getValue().values());
+		public Collection<Long> getValue() {
+			Collection<Long> results = new ArrayList<>();
+			for (Map.Entry<Long, Long> entry : outputs.entrySet()){
+				if(entry.getValue() > 0) {
+					results.add(entry.getKey());
+					results.add(entry.getValue());
 				}
 			}
 			return results;
