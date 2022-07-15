@@ -268,9 +268,10 @@ policy.windowSize: 5000000000
 trisk.exp.dir: /data
 trisk.taskmanager.managed_memory: 3072
 trisk.vScaling.python.path: /home/drg/projects/work3/flink/Trisk/Trisk-on-Flink/tools
-trisk.config.schedule_interval: 30000
+trisk.config.schedule_interval: 60000
 trisk.config.metrics_interval: 1000
 trisk.simple_test: false
+trisk.decay.rate: 0.8
 
 #==============================================================================
 # Backpressure Configuration
@@ -299,11 +300,11 @@ state.checkpoints.dir: file:///home/drg/projects/work3/flink/rocksdb-storage/che
 state.backend.rocksdb.localdir: /home/drg/projects/work3/flink/rocksdb-storage/localdir/
 state.backend.rocksdb.log.dir: /home/drg/projects/work3/flink/rocksdb-storage/logdir/
 state.backend.rocksdb.options-factory: rocksdbTuning.StatisticConfigurableOptionsFactory
-#state.backend.rocksdb.block.cache-size: 20m
+state.backend.rocksdb.block.cache-size: 20m
 #state.backend.rocksdb.memory.high-prio-pool-ratio: 0.8
 #state.backend.rocksdb.memory.write-buffer-ratio: 0.1
 # metrics.latency.interval: 100
-metrics.latency.history-size: 20
+#metrics.latency.history-size: 20
 metrics.latency.granularity: single
 state.backend.rocksdb.memory.managed: true
 state.backend.rocksdb.use-bloom-filter: true
@@ -317,5 +318,5 @@ state.backend.latency-track.keyed-state-enabled: true
 state.backend.latency-track.sample-interval: 2
 state.backend.latency-track.history-size: 1000
 state.backend.rocksdb.thread.num: 16
-state.backend.rocksdb.write-batch-size: 40m
-state.backend.rocksdb.writebuffer.count: 40
+state.backend.rocksdb.write-batch-size: 10m
+state.backend.rocksdb.writebuffer.count: 15

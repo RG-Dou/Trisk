@@ -31,10 +31,11 @@ init() {
   EXP_NAME="nexmark-$1"
 
   AUCTION_S=0
-  PERSON_S=300
+  PERSON_S=3000
   BID_S=$4
   STATE_SIZE=100000
   KEY_SIZE=50000
+  SKEWNESS=1
 
   PP=4
   AUCTION_P=${PP}
@@ -43,15 +44,16 @@ init() {
   JOIN_P=${PP}
   WIN_P=${PP}
 
-  runtime=1500
-  totalCachePerTM=2048
+  runtime=1200
+  totalCachePerTM=500
   # Controller="BlankController"
   # Group="true"
   # Controller="ElasticMemoryManager"
   # Group="false"
   Controller=$2
   Group=$3
-  SUB_DIR=$Controller+$Group
+  Try=$5
+  SUB_DIR=$Controller+$Group+$Try
 
   ROCKSDB_DIR="/home/drg/projects/work3/flink/rocksdb-storage"
   ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
@@ -141,9 +143,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} &
+  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &
 }
 
 function runGenerator() {
