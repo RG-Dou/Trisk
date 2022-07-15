@@ -130,7 +130,8 @@ public class RestfulMetricsRetriever {
 		return true;
 	}
 
-	public void collectMetrics(){
+	// metrics that needs to be updated fine-grained includes State Access Time,
+	public void collectMetricsFine(){
 		for(String operatorId : metrics.getOperatorList()){
 			Integer tasks = metrics.getNumTask(operatorId);
 			String operatorName = metrics.getOperator(operatorId).getOperatorName();
@@ -153,22 +154,28 @@ public class RestfulMetricsRetriever {
 				// Checkpoint Alignment Time
 				String metricsID = "checkpointAlignmentTime";
 				metrics.setAlignmentTime(operatorID, subTaskIndex, getSubTaskLongMetrics(operatorID, subTaskIndex, metricsID));
+
+				// 4. get queuing delay
+				metricsID = "queuingTime";
+				metrics.setQueuingDelay(operatorID, subTaskIndex, getSubTaskDoubleMetrics(operatorID, subTaskIndex, metricsID));
+
+				// 5. get service time
+				metricsID = "serviceTime";
+				metrics.setServiceTime(operatorID, subTaskIndex, getSubTaskDoubleMetrics(operatorID, subTaskIndex, metricsID));
 			}
 		}
 	}
 
-	public void updateMetrics(){
+	public boolean updateMetricsCoarse(){
 		metrics.incEpoch();
-		collectOtherMetrics();
-		collectRocksdbStats();
+		boolean flag = collectOtherMetrics();
+//		collectRocksdbStats();
 		metrics.preprocess();
-//		for(String operatorId:metrics.getOperatorList()){
-//			System.out.println(metrics.getOperator(operatorId).toSting());
-//		}
+		return flag;
 	}
 
 	//ToDo: some metrics should be cleared after one scheduling.
-	private void collectOtherMetrics(){
+	private boolean collectOtherMetrics(){
 
 		// stateful metrics
 		for(String operatorId : metrics.getOperatorList()){
@@ -187,28 +194,32 @@ public class RestfulMetricsRetriever {
 
 				// 2. get item frequency
 				String metricsIDIF = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "itemFrequency";
-				metrics.setItemFrequency(operatorId, subTaskIndex, stateName, getSubTaskListMetrics(operatorId, subTaskIndex, metricsIDIF));
+				ArrayList<Long> itemFrequency;
+				try {
+					itemFrequency = getSubTaskListMetrics(operatorId, subTaskIndex, metricsIDIF);
+				} catch (Exception e){
+					return false;
+				}
+				metrics.setItemFrequency(operatorId, subTaskIndex, stateName, itemFrequency);
 
-
-				// 3. get state access time
-				String tag = this.metrics.getStateAccessTimeTag(operatorId);
-				String metricsIDSATime = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + tag + "_mean";
-				metrics.setAccessTime(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsIDSATime) / 1000000.0);
-
-
-				// 4. get queuing delay
-				String metricsID = "queuingTime";
-				metrics.setQueuingDelay(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID));
-
-				// 5. get queuing delay
-				metricsID = "serviceTime";
-				metrics.setServiceTime(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID));
 
 				// 6. get number of records in
-				metricsID = "numRecordsIn";
+				String metricsID = "numRecordsIn";
 				metrics.setNumRecordsIn(operatorId, subTaskIndex, getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID));
+
+				// 7. get arrival rate
+				metricsID = "numRecordsInPerSecond";
+				metrics.setArrivalRate(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID));
+
+				metricsID = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "cacheDataHit";
+				Long hit = getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID);
+
+				metricsID = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "cacheDataMiss";
+				Long miss = getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID);
+				metrics.setCacheHitMiss(operatorId, subTaskIndex, hit, miss);
 			}
 		}
+		return true;
 	}
 
 	public void collectRocksdbStats(){
@@ -288,7 +299,7 @@ public class RestfulMetricsRetriever {
 		return tuple2;
 	}
 
-	private ArrayList<Long> getSubTaskListMetrics(String operatorId, int subTaskIndex, String metrics){
+	private ArrayList<Long> getSubTaskListMetrics(String operatorId, int subTaskIndex, String metrics) throws Exception{
 		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 //		System.out.println("address: " + address);
 		List<JSONObject> response = getMetricsJsonArray(address);
@@ -300,7 +311,8 @@ public class RestfulMetricsRetriever {
 				try {
 					list.add(Long.parseLong(value));
 				} catch (Exception e){
-					Log.info("error on metrics: " + metrics + " parse long: " + listStr);
+					Log.info("address" + address +" error on metrics: " + metrics + " parse long: " + listStr);
+					throw e;
 				}
 			}
 			break;
