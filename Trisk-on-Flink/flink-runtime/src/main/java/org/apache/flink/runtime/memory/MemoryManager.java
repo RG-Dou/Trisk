@@ -760,14 +760,14 @@ public class MemoryManager {
 		sharedResources.resize(totalSize);
 
 		//Shrink managed memory
-		memoryBudget.shrink(pages * pageSize);
+//		memoryBudget.shrink(pages * pageSize);
 		totalNumberOfPages.addAndGet(-pages);
 	}
 
 	//Issue: vScaling
 	public void expand(long pages){
 		//Expand managed memory first
-		memoryBudget.expand(pages * pages);
+//		memoryBudget.expand(pages * pages);
 		totalNumberOfPages.addAndGet(pages);
 
 		//Expand block cache
