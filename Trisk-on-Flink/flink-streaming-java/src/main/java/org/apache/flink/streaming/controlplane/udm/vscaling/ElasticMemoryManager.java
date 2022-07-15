@@ -1,60 +1,31 @@
 package org.apache.flink.streaming.controlplane.udm.vscaling;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.MemorySize;
-import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
-import org.apache.flink.streaming.controlplane.rescale.metrics.RestfulMetricsRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
-import org.apache.flink.streaming.controlplane.udm.AbstractController;
 import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.locks.ReentrantLock;
 
 // ToDo: comments and logs
-public class ElasticMemoryManager extends AbstractController {
+public class ElasticMemoryManager extends AbstractMemoryManager {
 	private static final Logger LOG = LoggerFactory.getLogger(ElasticMemoryManager.class);
-
-	private final Object object = new Object();
 	private final TestingThread testingThread;
-	private final RestfulMetricsRetriever mRetriever;
-	private final VScalingMetrics metrics;
 	private final PythonAlgorithm algorithm;
-	private final String REST_SERVER_IP = "trisk.config.rest_server_ip";
-	private final String REST_SERVER_PORT = "rest.port";
-	private final String JOB_NAME = "trisk.config.job_name";
+
 	private final String SCHEDULE_INTERVAL = "trisk.config.schedule_interval";
-	private final String METRICS_INTERVAL = "trisk.config.metrics_interval";
-	//Todo: how to get total memeory;
-	private final String TM_MANAGED_MEMORY = "trisk.taskmanager.managed_memory";
 	private final String AlgorithmDataPath = "trisk.vScaling.python.path";
-	private final String ROCKSDB_LOG_DIR = "state.backend.rocksdb.log.dir";
-
-	private final String SIMPLE_TEST = "trisk.simple_test";
-
 	private final Long scheduleInterval;
-	private final Long metricsInterval;
 	private boolean onScheduling = false;
 	private long scheduleTime;
 
-	private ReentrantLock lock = new ReentrantLock();
-
 	public ElasticMemoryManager(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
-		super(reconfigurationExecutor);
-		String jobName = configuration.getString(JOB_NAME, "Nexmark Query");
+		super(reconfigurationExecutor, configuration);
 		scheduleInterval = configuration.getLong(SCHEDULE_INTERVAL, 20000);
-		metricsInterval = configuration.getLong(METRICS_INTERVAL, 1000);
-		long totalMem = configuration.getLong(TM_MANAGED_MEMORY, 50);
-		metrics = new VScalingMetrics(totalMem);
-		String rocksdbLogDir = configuration.getString(ROCKSDB_LOG_DIR, "");
-		mRetriever = new RestfulMetricsRetriever(configuration.getString(REST_SERVER_IP, "localhost"), configuration.getInteger(REST_SERVER_PORT, 8081), jobName, metrics, rocksdbLogDir);
 		// ToDo: the python path should be a relative path: "Trisk-on-Flink/flink-tools/"
 		String algorithmPath = configuration.getString(AlgorithmDataPath, "/home/drg/projects/work3/flink/alg-data/");
 		algorithm = new PythonAlgorithm(metrics, algorithmPath);
@@ -93,18 +64,8 @@ public class ElasticMemoryManager extends AbstractController {
 		}
 	}
 
-	private void showOperatorInfo() {
-		ExecutionPlan streamJobState = getReconfigurationExecutor().getTrisk();
-		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperator(); it.hasNext(); ) {
-			OperatorDescriptor descriptor = it.next();
-			System.out.println(descriptor);
-			System.out.println("key mapping:" + streamJobState.getKeyMapping(descriptor.getOperatorID()));
-			System.out.println("key state allocation" + streamJobState.getKeyStateAllocation(descriptor.getOperatorID()));
-			System.out.println("-------------------");
-		}
-	}
-
-	private boolean updateSlotInfo(){
+	@Override
+	public boolean updateSlotInfo(){
 		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		Collection<TaskManagerSlot> allSlots = getReconfigurationExecutor().getAllSlots();
 		// Create slot information for all slots, include other jobs' slots, this job's slots: stateful and stateless slots.
@@ -162,42 +123,8 @@ public class ElasticMemoryManager extends AbstractController {
 		return true;
 	}
 
-	public void cacheSizeInit(){
-		for(Map.Entry<Integer, List<SlotMetrics>> entry : metrics.getSlotTMMap().entrySet()){
-			List<SlotMetrics> slots = entry.getValue();
-			long avgSize = metrics.getTotalMem() / slots.size();
-			System.out.println("Init: average slot size " + avgSize + "M, total memory " + metrics.getTotalMem() + "M, for instance " + entry.getKey());
-			for(SlotMetrics slot : slots){
-				slot.setTargetMemSize(avgSize);
-				metrics.addExpand(slot);
-			}
-		}
-		resizeGroup(new ArrayList<>(metrics.getExpand()));
-//		int totalNumTasks = 0;
-//		for (String operatorID : metrics.getOperatorList()){
-//			OperatorMetrics operator = metrics.getOperator(operatorID);
-//			totalNumTasks += operator.getNumTasks();
-//		}
-//		long avgSize = metrics.getTotalMem();
-//		if(totalNumTasks != 0)
-//			avgSize = avgSize / totalNumTasks;
-//		for (String operatorID : metrics.getOperatorList()){
-//			OperatorMetrics operator = metrics.getOperator(operatorID);
-//			int numTasks = operator.getNumTasks();
-//			for(int taskIndex = 0; taskIndex < numTasks; taskIndex ++){
-//				TaskMetrics task = operator.getTaskMetrics(taskIndex);
-//				task.setOptimalAllocation(avgSize);
-//				SlotMetrics slot = metrics.getSlot(task.getSlotID());
-//				slot.setTargetMemSize(avgSize);
-//				System.out.println("Init: operator: " + operator.getOperatorName() + ", task: " + taskIndex + ", target: " + avgSize);
-//				metrics.addExpand(slot);
-//			}
-//		}
-//		resizeGroup(metrics.getExpand());
-	}
-
 	private void startResize(){
-//		grouping();
+		grouping();
 		if(metrics.getShrink().size() == 0 && metrics.getExpand().size() == 0){
 			onScheduling = false;
 			scheduleTime = System.currentTimeMillis();
@@ -244,34 +171,8 @@ public class ElasticMemoryManager extends AbstractController {
 		}
 	}
 
-	private void resizeGroup(List<SlotMetrics> group){
-		for(SlotMetrics slot : group){
-			MemorySize mem = new MemorySize(slot.getTargetMemSize() * 1024 * 1024);
-			//ToDo: how about the CPU cores
-			ResourceProfile target = ResourceProfile.newBuilder()
-				.setCpuCores(1).setManagedMemory(mem).build();
-			resize(slot.getSlot().getSlotId(), target);
-		}
-	}
-
-	private void resize(SlotID slotID, ResourceProfile resourceProfile){
-		getReconfigurationExecutor().updateSlotResource(slotID, resourceProfile, new ReconfigurationExecutor.UpdateResourceCallback() {
-			@Override
-			public void callback(SlotID slotID) {
-				onSuccessResize(slotID);
-			}
-		});
-	}
-
-	private void onSuccessResize(SlotID slotID){
-		SlotMetrics slot = metrics.getSlot(slotID.toString());
-		slot.setOldMemSize(slot.getTargetMemSize());
-		LOG.info("Resource Update Successfully for slot: " + slotID);
-
-		checkScheduleDone(slotID);
-	}
-
-	private void checkScheduleDone(SlotID slotID){
+	@Override
+	public void checkScheduleDone(SlotID slotID){
 		lock.lock();
 		List<SlotMetrics> shrinks = metrics.getShrink();
 		List<SlotMetrics> expands = metrics.getExpand();
@@ -295,116 +196,57 @@ public class ElasticMemoryManager extends AbstractController {
 		lock.unlock();
 	}
 
-
-	public void printInAndOut(){
-		for (String operatorID: metrics.getOperatorFullList()){
-			OperatorMetrics operator = metrics.getOperator(operatorID);
-			String name = operator.getOperatorName();
-			if(name.contains("TimeAssigner")){
-				int numTasks = operator.getNumTasks();
-				for (int i = 0; i < numTasks; i ++){
-					TaskMetrics task = operator.getTaskMetrics(i);
-					long out = task.getRecordsIn();
-					System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + name + ", task:" + i + ", numRecordsOut:" + out);
-				}
-			}
-		}
-		for (String operatorID : metrics.getOperatorList()){
-			OperatorMetrics operator = metrics.getOperator(operatorID);
-			int numTasks = operator.getNumTasks();
-			String operatorName = operator.getOperatorName();
-			for (int i = 0; i < numTasks; i ++){
-				TaskMetrics task = operator.getTaskMetrics(i);
-				long in = task.getRecordsIn();
-				System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + operatorName + ", task:" + i + ", numRecordsIn:" + in);
-			}
-		}
-	}
-
-
-	public void printInfo(){
-		for (String operatorID: metrics.getOperatorFullList()){
-			OperatorMetrics operator = metrics.getOperator(operatorID);
-			String name = operator.getOperatorName();
-			if(Objects.equals(name, "Simple FlapMap----")){
-				int numTasks = operator.getNumTasks();
-				for (int i = 0; i < numTasks; i ++){
-					TaskMetrics task = operator.getTaskMetrics(i);
-					double queuingDelay = task.getQueuingTime();
-					double alignmentTime = task.getAlignmentTime();
-					System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + name + ", queuingDelay:" + queuingDelay +
-						", alignmentTime:" + alignmentTime);
-				}
-			}
-		}
-		for (String operatorID : metrics.getOperatorList()){
-			OperatorMetrics operator = metrics.getOperator(operatorID);
-			int numTasks = operator.getNumTasks();
-			String operatorName = operator.getOperatorName();
-			double k = operator.getk();
-			double alpha = operator.getAlpha();
-			double beta = operator.getBeta();
-			double stateSize = operator.getStateSize();
-			System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + operatorName + ", k:" + k + ", alpha:" + alpha + ", beta:" + beta + ", stateSize:" + stateSize);
-			for (int i = 0; i < numTasks; i ++){
-				TaskMetrics task = operator.getTaskMetrics(i);
-				double queuingDelay = task.getQueuingTime();
-				double serviceTime = task.getServiceTime();
-				double t = task.getFrontEndTime();
-				double backlog = task.getBacklog();
-				long optimal = (long) task.getOptimalAllocation();
-				StateMetrics state = task.getStateMetric();
-				double stateTime = state.getAccessTime();
-				double hitRatio = state.getHitRatio();
-				System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + operatorName + ", task:" + i + ", queuingDelay:" + queuingDelay +
-					", serviceTime:" + serviceTime + ", frontEndTime:" + t + ", backlog:" + backlog +
-					", optimal:" + optimal + ", stateTime:" + stateTime + ", hitRatio:" + hitRatio);
-			}
-		}
-	}
-
 	private class TestingThread extends Thread {
+
+		public boolean init(){
+			mRetriever.init();
+			boolean flag = updateSlotInfo();
+			cacheSizeInit();
+			algorithm.init();
+			return flag;
+		}
 
 		@Override
 		public void run() {
 
-			LOG.info("Before Vertical Scaling Test");
+			LOG.info("Elastic Memory Manager Test");
+			System.out.println("Elastic Memory Manager Test");
 
 			try {
 				// todo, if the time of sleep is too short, may cause receiving not belong key
 				Thread.sleep(30000);
-				boolean flag = true;
-				mRetriever.init();
-				flag = updateSlotInfo();
-				cacheSizeInit();
-				algorithm.init();
-				Thread.sleep(9*60*1000);
-				long warnUp = 3*60*1000;
+				boolean flag = init();
 
-				scheduleTime = System.currentTimeMillis();
-				long warnUpStart = scheduleTime;
-				long metricsTime = System.currentTimeMillis();
+				Thread.sleep(6*60*1000);
+				long warnUp = 4*60*1000;
+
+				long now = System.currentTimeMillis();
+				scheduleTime = now;
+				long warnUpStart = now, metricsTimeFine = now, metricsTimeCoarse = now;
 				while (flag) {
-					while(System.currentTimeMillis() - metricsTime <= metricsInterval){}
-					metricsTime = System.currentTimeMillis();
+					while(System.currentTimeMillis() - metricsTimeFine <= metricsIntervalFine){}
+
 					if(!onScheduling) {
-						mRetriever.collectMetrics();
-						if(System.currentTimeMillis() - scheduleTime >= scheduleInterval){
-							mRetriever.updateMetrics();
+						now = System.currentTimeMillis();
 
-							// update KandB
-//							algorithm.excCheApprox();
-							// ToDo: Check whether metrics are collected correctly.
-//							metrics.updateKandB();
-
-							printInfo();
-							if (System.currentTimeMillis() - warnUpStart >= warnUp) {
-								algorithm.startExec();
-
-								onScheduling = true;
-								startResize();
-							}
+						if(now - metricsTimeFine > metricsIntervalFine) {
+							mRetriever.collectMetricsFine();
+							metricsTimeFine = now;
 						}
+
+						boolean success = false;
+						if(now - metricsTimeCoarse > metricsIntervalCoarse){
+							success = mRetriever.updateMetricsCoarse();
+							metricsTimeCoarse = now;
+						}
+
+						if(success && (now - scheduleTime >= scheduleInterval) && (System.currentTimeMillis() - warnUpStart >= warnUp)){
+							algorithm.startExec();
+							onScheduling = true;
+							startResize();
+						}
+
+						printBasicStateful();
 					}
 				}
 			} catch (InterruptedException e) {

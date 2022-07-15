@@ -32,18 +32,20 @@ public abstract class AbstractMemoryManager extends AbstractController {
 	//Todo: how to get total memeory;
 	private final String TM_MANAGED_MEMORY = "trisk.taskmanager.managed_memory";
 	private final String ROCKSDB_LOG_DIR = "state.backend.rocksdb.log.dir";
-	private final String FLINK_CONF = "trisk.conf.dir";
 
 	private final String DECAY_RATE = "trisk.decay.rate";
 
-	private final Long metricsInterval;
+	public final Long metricsIntervalFine;
+	public final Long metricsIntervalCoarse;
 	private final double decayRate;
-	private ReentrantLock lock = new ReentrantLock();
+	public ReentrantLock lock = new ReentrantLock();
+	private final long writeBuffer = 30;
 
 	public AbstractMemoryManager(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor);
 		String jobName = configuration.getString(JOB_NAME, "Nexmark Query");
-		metricsInterval = configuration.getLong(METRICS_INTERVAL, 1000);
+		metricsIntervalFine = configuration.getLong(METRICS_INTERVAL, 1000);
+		metricsIntervalCoarse = metricsIntervalFine * 40;
 		long totalMem = configuration.getLong(TM_MANAGED_MEMORY, 50);
 		metrics = new VScalingMetrics(totalMem);
 		decayRate = configuration.getDouble(DECAY_RATE, 0.8);
@@ -106,7 +108,7 @@ public abstract class AbstractMemoryManager extends AbstractController {
 					slotMetric.setType("stateless");
 				}
 
-				taskMetric.setOptimalAllocation(slotMetric.getOldMemSize());
+//				taskMetric.setOptimalAllocation(slotMetric.getOldMemSize());
 
 				// Add task to the slot metric
 				slotMetric.addTask(taskMetric);
@@ -123,16 +125,19 @@ public abstract class AbstractMemoryManager extends AbstractController {
 			System.out.println("Init: average slot size " + avgSize + "M, total memory " + metrics.getTotalMem() + "M, for instance " + entry.getKey());
 			for(SlotMetrics slot : slots){
 				slot.setTargetMemSize(avgSize);
+				for(TaskMetrics taskMetrics : slot.getTasks()){
+					taskMetrics.setOptimalAllocation(avgSize);
+				}
 				metrics.addExpand(slot);
 			}
 		}
 		resizeGroup(new ArrayList<>(metrics.getExpand()));
 	}
 
-	private void resizeGroup(List<SlotMetrics> group){
+	public void resizeGroup(List<SlotMetrics> group){
 
 		for(SlotMetrics slot : group){
-			MemorySize mem = new MemorySize(slot.getTargetMemSize() * 1024 * 1024);
+			MemorySize mem = new MemorySize((slot.getTargetMemSize() + writeBuffer) * 1024 * 1024);
 			//ToDo: how about the CPU cores
 			ResourceProfile target = ResourceProfile.newBuilder()
 				.setCpuCores(1).setManagedMemory(mem).build();
@@ -157,7 +162,7 @@ public abstract class AbstractMemoryManager extends AbstractController {
 		checkScheduleDone(slotID);
 	}
 
-	private void checkScheduleDone(SlotID slotID){
+	public void checkScheduleDone(SlotID slotID){
 		lock.lock();
 		List<SlotMetrics> shrinks = metrics.getShrink();
 		List<SlotMetrics> expands = metrics.getExpand();
@@ -177,5 +182,36 @@ public abstract class AbstractMemoryManager extends AbstractController {
 			LOG.info("All slots are resized successfully!!!");
 		}
 		lock.unlock();
+	}
+
+	public void printBasicStateful(){
+		for (String operatorID : metrics.getOperatorList()){
+			OperatorMetrics operator = metrics.getOperator(operatorID);
+			int numTasks = operator.getNumTasks();
+			String operatorName = operator.getOperatorName();
+			double k = operator.getk();
+			double alpha = operator.getAlpha();
+			double beta = operator.getBeta();
+			double stateSize = operator.getStateSize();
+			System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + operatorName + ", k:" + k + ", alpha:" + alpha + ", beta:" + beta + ", stateSize:" + stateSize);
+			for (int i = 0; i < numTasks; i ++){
+				TaskMetrics task = operator.getTaskMetrics(i);
+				double queuingDelay = task.getQueuingTime();
+				double serviceTime = task.getServiceTime();
+				double t = task.getFrontEndTime();
+				double rate = task.getArrivalRate();
+				double backlog = task.getBacklog();
+				long optimal = (long) task.getOptimalAllocation();
+				StateMetrics state = task.getStateMetric();
+				double stateTime = state.getAccessTime();
+				double stateTimeInstant = state.getAccessTimeInstant();
+				double hitRatio = state.getHitRatio();
+				long hits = task.getHit();
+				long miss = task.getMiss();
+				System.out.println("MetricsReport:" + System.currentTimeMillis() + ", operator:" + operatorName + ", task:" + i + ", queuingDelay:" + queuingDelay +
+					", serviceTime:" + serviceTime + ", frontEndTime:" + t + ", arrivalRate:" + rate + ", backlog:" + backlog +
+					", optimal:" + optimal + ", stateTime:" + stateTimeInstant + ", hitRatio:" + hitRatio + ", hits:" + hits + ", miss:" + miss);
+			}
+		}
 	}
 }
