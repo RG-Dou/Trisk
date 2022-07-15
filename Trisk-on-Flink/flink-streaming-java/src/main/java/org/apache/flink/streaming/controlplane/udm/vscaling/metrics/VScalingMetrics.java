@@ -18,6 +18,7 @@ public class VScalingMetrics {
 	// Algorithm Output
 	private String algorithmInfo = "false";
 	private String cheApproxInfo;
+	private double decayRate = 0.8;
 
 	// Slot information
 	private final Map<String, SlotMetrics> slotsMap = new HashMap<>();
@@ -118,15 +119,23 @@ public class VScalingMetrics {
 	}
 
 	public void setQueuingDelay(String operatorId, int taskIndex, double queuingTime){
-		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setQueuingTime(queuingTime);
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setQueuingTime(queuingTime, decayRate);
 	}
 
 	public void setServiceTime(String operatorId, int taskIndex, double serviceTime){
-		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setServiceTime(serviceTime);
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setServiceTime(serviceTime, decayRate);
 	}
 
 	public void setNumRecordsIn(String operatorId, int taskIndex, long recordsIn){
 		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setRecordsIn(recordsIn);
+	}
+
+	public void setArrivalRate(String operatorId, int taskIndex, double rate){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setArrivalRate(rate);
+	}
+
+	public void setCacheHitMiss(String operatorId, int taskIndex, long hit, long miss){
+		operatorFullMap.get(operatorId).getTaskMetrics(taskIndex).setCacheHitMiss(hit, miss);
 	}
 
 	public void setAlignmentTime(String operatorId, int taskIndex, long latencyNano){
@@ -178,6 +187,15 @@ public class VScalingMetrics {
 		return result.toString();
 	}
 
+	public String arrivalRateToString(){
+		StringBuilder result = new StringBuilder();
+		for(String operatorId : operatorList){
+			result.append(operatorMap.get(operatorId).arrivalRateString()).append("|");
+		}
+		result.deleteCharAt(result.lastIndexOf("|"));
+		return result.toString();
+	}
+
 	public void setStateSizesState(String operatorId, int taskIndex, double size){
 		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().setStateSize(size);
 	}
@@ -194,8 +212,6 @@ public class VScalingMetrics {
 		updateFrontEndTime();
 		updateBacklog();
 		training();
-//		updateAlignmentTime();
-//		updateEndToEndLatency();
 	}
 
 	private void updateStateSizesTask(){
@@ -337,4 +353,7 @@ public class VScalingMetrics {
 		this.shrinkingSlots.clear();
 	}
 
+	public void setDecayRate(double decayRate){
+		this.decayRate = decayRate;
+	}
 }

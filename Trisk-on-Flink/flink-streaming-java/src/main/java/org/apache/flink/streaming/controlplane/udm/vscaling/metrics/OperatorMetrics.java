@@ -21,8 +21,8 @@ public class OperatorMetrics {
 
 	// Raw Data
 	private double stateSize;
-	private double alpha;
-	private double beta;
+	private double alpha=0.0;
+	private double beta=0.0;
 	private double k;
 
 	public OperatorMetrics(String id, String name){
@@ -122,6 +122,7 @@ public class OperatorMetrics {
 		for (TaskMetrics task : taskMetricsList){
 			StateMetrics state = task.getStateMetric();
 			linearAlgorithm.addData(1 - state.getHitRatio(), state.getAccessTime());
+			System.out.println("Operator:" + operatorName + " TrainingData: missRatio:" + (1-state.getHitRatio()) + " stateTime:" + state.getAccessTime());
 		}
 		linearAlgorithm.excRegression();
 		this.alpha = linearAlgorithm.getSlope();
@@ -166,6 +167,15 @@ public class OperatorMetrics {
 		StringBuilder builder = new StringBuilder();
 		for (TaskMetrics task : taskMetricsList){
 			builder.append(task.getBacklog()).append(";");
+		}
+		builder.deleteCharAt(builder.lastIndexOf(";"));
+		return builder.toString();
+	}
+
+	public String arrivalRateString(){
+		StringBuilder builder = new StringBuilder();
+		for (TaskMetrics task : taskMetricsList){
+			builder.append(task.getArrivalRate()).append(";");
 		}
 		builder.deleteCharAt(builder.lastIndexOf(";"));
 		return builder.toString();

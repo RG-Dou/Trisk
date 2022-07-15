@@ -35,6 +35,10 @@ public class SlotMetrics {
 		tasks.add(task);
 	}
 
+	public List<TaskMetrics> getTasks(){
+		return tasks;
+	}
+
 	public String getType() {
 		return type;
 	}

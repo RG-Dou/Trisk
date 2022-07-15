@@ -20,6 +20,7 @@ public class TaskMetrics {
 	private double serviceTime;
 	private double queuingTime;
 	private long recordsIn;
+	private double arrivalRate;
 	private double alignmentTime;
 	private final Tuple2<Long, Long> missStats = new Tuple2<>(0L, 0L);
 	private final Tuple2<Long, Long> hitStats = new Tuple2<>(0L, 0L);
@@ -51,16 +52,16 @@ public class TaskMetrics {
 		return stateName;
 	}
 
-	public void setQueuingTime(double queuingTime) {
-		this.queuingTime = queuingTime;
+	public void setQueuingTime(double queuingTime, double decayRate) {
+		this.queuingTime = queuingTime * (1 - decayRate) + this.queuingTime * decayRate;
 	}
 
 	public double getQueuingTime() {
 		return queuingTime;
 	}
 
-	public void setServiceTime(double serviceTime){
-		this.serviceTime = serviceTime;
+	public void setServiceTime(double serviceTime, double decayRate){
+		this.serviceTime = serviceTime * (1 - decayRate) + this.serviceTime * decayRate;
 	}
 
 	public double getServiceTime(){
@@ -73,6 +74,14 @@ public class TaskMetrics {
 
 	public long getRecordsIn() {
 		return recordsIn;
+	}
+
+	public void setArrivalRate(double rate) {
+		this.arrivalRate = rate / 1000;
+	}
+
+	public double getArrivalRate() {
+		return arrivalRate;
 	}
 
 	public void setAlignmentTime(double time) {
@@ -160,6 +169,14 @@ public class TaskMetrics {
 
 	public void setInstanceID(int instanceID) {
 		InstanceID = instanceID;
+	}
+
+	public long getHit() {
+		return hitStats.f1;
+	}
+
+	public long getMiss() {
+		return missStats.f1;
 	}
 
 

@@ -13,6 +13,7 @@ public class StateMetrics {
 	private double stateSize;
 	private ArrayList<Long> itemFrequency;
 	private double hitRatio;
+	private double stateTimeInstant;
 
 	// f0. watermark -- the start counter of this time scheduling
 	// f1. collection times
@@ -27,7 +28,12 @@ public class StateMetrics {
 		return accessTime;
 	}
 
+	public double getAccessTimeInstant() {
+		return stateTimeInstant;
+	}
+
 	public void setAccessTime(double accessTime) {
+		stateTimeInstant = accessTime;
 		stateTimeStats.f2 += accessTime;
 		stateTimeStats.f1 += 1;
 	}
@@ -59,10 +65,6 @@ public class StateMetrics {
 	public void updateStateTime(long recordsIn){
 		// Calculate the average time of one access
 		accessTime = stateTimeStats.f2 / (stateTimeStats.f1 - stateTimeStats.f0);
-
-//		System.out.println("Average time of one access: " + accessTime + ", average counter: " + (this.accessCounter * 1.0 / recordsIn));
-		// times the average access times.
-//		accessTime = this.accessCounter * 1.0 / recordsIn * accessTime;
 
 		stateTimeStats.f0 = stateTimeStats.f1;
 		stateTimeStats.f2 = 0.0;
