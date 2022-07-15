@@ -31,9 +31,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StateMigrationException;
 
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteOptions;
+import org.rocksdb.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -109,7 +107,7 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		this.dataInputView = new DataInputDeserializer();
 		this.sharedKeyNamespaceSerializer = backend.getSharedRocksKeyBuilder();
 
-		this.putStatsMetrics = new PutStatsMetrics<K>(metricGroup, stateName);
+		this.putStatsMetrics = new PutStatsMetrics<K>(metricGroup, stateName, backend.dbOptions);
 	}
 
 	// ------------------------------------------------------------------------
@@ -253,6 +251,7 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 	public void updateItemFrequency(Object key){
 		putStatsMetrics.updateKeyGroup(sharedKeyNamespaceSerializer.keyGroup, sharedKeyNamespaceSerializer.key);
 		putStatsMetrics.updateGetItemFrequency(key);
+		putStatsMetrics.updateCacheStat();
 	}
 
 	public void updateStateSize(long size){
@@ -264,17 +263,31 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		protected static final String STATE_NAME_KEY = "state_name";
 		protected static final String ITEM_FREQUENCY = "itemFrequency";
 		protected static final String STATE_SIZE = "stateSize";
+		protected static final String CACHE_MISS = "cacheDataMiss";
+		protected static final String CACHE_HIT = "cacheDataHit";
+
 		private final ItemFrequencyGauge<K> itemFrequencyGauge = new ItemFrequencyGauge<K>();
+		private final CacheStat cacheMiss;
+		private final CacheStat cacheHit;
 		private final AvgStateSizeGauge stateSizeGauge = new AvgStateSizeGauge();
 		private int keyGroup;
 		private K key;
 
+		private long updateTime = 0;
+		private static final long INTERVAL = 5000;
+
 		//Todo: consider the namespace
 
-		private PutStatsMetrics(MetricGroup metricGroup, String stateName) {
+		private PutStatsMetrics(MetricGroup metricGroup, String stateName, DBOptions dbOptions) {
 			this.metricGroup =  metricGroup.addGroup(STATE_NAME_KEY, stateName);
 			this.metricGroup.gauge(ITEM_FREQUENCY, itemFrequencyGauge);
 			this.metricGroup.gauge(STATE_SIZE, stateSizeGauge);
+
+			cacheHit = new CacheStat(dbOptions, "rocksdb.block.cache.data.hit");
+			this.metricGroup.gauge(CACHE_HIT, cacheHit);
+
+			cacheMiss = new CacheStat(dbOptions, "rocksdb.block.cache.data.miss");
+			this.metricGroup.gauge(CACHE_MISS, cacheMiss);
 		}
 
 		private void updateKeyGroup(int keyGroup, K key){
@@ -283,48 +296,45 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		}
 
 		private void updateGetItemFrequency(Object userKey){
-			itemFrequencyGauge.putItem(keyGroup, key, userKey);
+			itemFrequencyGauge.putItem(key, userKey);
 		}
 
 		private void updateStateSize(final long size){
 			stateSizeGauge.putStateSize(size);
 		}
+
+		private void updateCacheStat(){
+			if(System.currentTimeMillis() - updateTime > INTERVAL) {
+				cacheHit.update();
+				cacheMiss.update();
+				updateTime = System.currentTimeMillis();
+			}
+		}
 	}
 
 	public static class ItemFrequencyGauge<K> implements Gauge<Collection<Long>> {
 
-		private final Map<Integer, Map<K, Map<Object, AtomicLong>>> itemFrequency = new HashMap<>();
+		private final Map<K, Map<Object, AtomicLong>> itemFrequencyDummp = new HashMap<>();
 		private final Map<Long, Long> outputs = new HashMap<>();
 
-		public void putItem(Integer groupId, K key, Object userKey) {
+		public void putItem(K key, Object userKey) {
 			if (userKey == null)
 				userKey = key;
-			Map<K, Map<Object, AtomicLong>> keyAndUserKey = itemFrequency.get(groupId);
-			Map<Object, AtomicLong> ukFreq;
+			Map<Object, AtomicLong> UserKeys = itemFrequencyDummp.get(key);
 			AtomicLong count;
-			if (keyAndUserKey != null){
-				ukFreq = keyAndUserKey.get(key);
-				if (ukFreq != null){
-					count = ukFreq.get(userKey);
-					if (count != null){
-						count.addAndGet(1);
-					} else {
-						count = new AtomicLong(1);
-						ukFreq.put(userKey, count);
-					}
+			if (UserKeys != null){
+				count = UserKeys.get(userKey);
+				if (count != null){
+					count.addAndGet(1);
 				} else {
 					count = new AtomicLong(1);
-					ukFreq = new HashMap<>();
-					ukFreq.put(userKey, count);
-					keyAndUserKey.put(key, ukFreq);
+					UserKeys.put(userKey, count);
 				}
 			} else {
 				count = new AtomicLong(1);
-				ukFreq = new HashMap<>();
-				ukFreq.put(userKey, count);
-				keyAndUserKey = new HashMap<>();
-				keyAndUserKey.put(key, ukFreq);
-				itemFrequency.put(groupId, keyAndUserKey);
+				UserKeys = new HashMap<>();
+				UserKeys.put(userKey, count);
+				itemFrequencyDummp.put(key, UserKeys);
 			}
 			long counter = count.get();
 			Long counterCount = outputs.get(counter);
@@ -369,5 +379,32 @@ public abstract class AbstractRocksDBState<K, N, V> implements InternalKvState<K
 		public Tuple2<Double, Long> getValue() {
 			return new Tuple2<>(avgStateSize, counter);
 		}
+	}
+
+	public static class CacheStat implements Gauge<Long>{
+
+		private long stat;
+		private DBOptions dbOptions;
+		private String metrics;
+
+		public CacheStat(DBOptions dbOptions, String metrics) {
+			this.dbOptions = dbOptions;
+			this.metrics = metrics;
+		}
+
+		public void update() {
+				String[] lines = dbOptions.statistics().toString().split("\n");
+				for (String line : lines){
+					if (line.contains(metrics)){
+						stat = Long.parseLong(line.split(" : ")[1]);
+					}
+				}
+		}
+
+		@Override
+		public Long getValue() {
+			return stat;
+		}
+
 	}
 }

@@ -345,6 +345,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 			keyGroupRange,
 			numberOfKeyGroups
 		);
+		assert restoreOperation != null;
 		return new RocksDBKeyedStateBackend<>(
 			this.userCodeClassLoader,
 			this.instanceBasePath,
@@ -356,6 +357,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 			this.ttlTimeProvider,
 			latencyTrackingStateConfig,
 			db,
+			restoreOperation.getDbOptions(),
 			kvStateInformation,
 			keyGroupPrefixBytes,
 			cancelStreamRegistryForBackend,

@@ -66,12 +66,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.ResourceGuard;
 import org.apache.flink.util.StateMigrationException;
 
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.Snapshot;
-import org.rocksdb.WriteOptions;
+import org.rocksdb.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -200,6 +195,8 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 	 */
 	protected final RocksDB db;
 
+	protected final DBOptions dbOptions;
+
 	// mark whether this backend is already disposed and prevent duplicate disposing
 	private boolean disposed = false;
 
@@ -216,6 +213,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		TtlTimeProvider ttlTimeProvider,
 		LatencyTrackingStateConfig latencyTrackingStateConfig,
 		RocksDB db,
+		DBOptions dbOptions,
 		LinkedHashMap<String, RocksDbKvStateInfo> kvStateInformation,
 		int keyGroupPrefixBytes,
 		CloseableRegistry cancelStreamRegistry,
@@ -259,6 +257,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		checkArgument(writeBatchSize >= 0, "Write batch size have to be no negative value.");
 		this.writeBatchSize = writeBatchSize;
 		this.db = db;
+		this.dbOptions = dbOptions;
 		this.rocksDBResourceGuard = rocksDBResourceGuard;
 		this.checkpointSnapshotStrategy = checkpointSnapshotStrategy;
 		this.savepointSnapshotStrategy = savepointSnapshotStrategy;

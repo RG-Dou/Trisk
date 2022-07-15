@@ -214,4 +214,8 @@ public abstract class AbstractRocksDBRestoreOperation<K> implements RocksDBResto
 
 	@Override
 	public abstract RocksDBRestoreResult restore() throws Exception;
+
+	public DBOptions getDbOptions() {
+		return dbOptions;
+	}
 }
