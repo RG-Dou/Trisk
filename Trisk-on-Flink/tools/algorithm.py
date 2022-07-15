@@ -294,10 +294,8 @@ def init_x0(state_sizes, total_item, backlog, arrival_rate, total_memory):
         total_backlog = 0
         for j in range(0, task_num[i]):
             total_backlog += backlog[i][j]
-        task_init = []
         for j in range(0, task_num[i]):
-            task_init.append(int(backlog[i][j] * 1.0 / total_backlog * operator_memory))
-        array.append(task_init)
+            array.append(int(backlog[i][j] * 1.0 / total_backlog * operator_memory))
     return array, task_sizes
 
 
