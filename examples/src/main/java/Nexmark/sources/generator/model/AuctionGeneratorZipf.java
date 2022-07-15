@@ -134,7 +134,8 @@ public class AuctionGeneratorZipf implements Serializable {
         seller += GeneratorConfig.FIRST_PERSON_ID;
 
         long category = GeneratorConfig.FIRST_CATEGORY_ID + random.nextInt(NUM_CATEGORIES);
-        long initialBid = nextPrice(random);
+//        long initialBid = nextPrice(random);
+        long initialBid = 100_000_000;
 //        long expires = timestamp + nextAuctionLengthMs(eventsCountSoFar, random, timestamp, config);
         long expires = timestamp + 5000000;
         String name = nextString(random, 20);

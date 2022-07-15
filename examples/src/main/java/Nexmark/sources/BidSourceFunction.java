@@ -100,11 +100,12 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
 //        warmup(ctx);
 
         long startTs = System.currentTimeMillis();
+        long newStartTs = startTs;
 
         System.out.println("Warm up phase 2");
         curRate = curRate * 3 / 5;
         while (running) {
-            if (System.currentTimeMillis() - startTs < warmUpInterval / 2) {
+            if (System.currentTimeMillis() - startTs < warmUpInterval / 4) {
                 //Read Warm up
                 System.out.println("Bid: epoch: " + epoch % cycle + " current rate is: " + curRate);
                 sendEvents(ctx, curRate, skewFieldWarm);
@@ -116,6 +117,12 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
                     System.out.println("Bid: epoch: " + epoch % cycle + " current rate is: " + curRate);
                     count = 0;
                 }
+
+//                if(System.currentTimeMillis() - newStartTs >= 60*1000){
+//                    newStartTs = System.currentTimeMillis();
+//                    base = base + 200;
+//                }
+
                 sendEvents(ctx, curRate, skewField);
                 count++;
             }

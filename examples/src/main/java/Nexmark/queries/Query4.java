@@ -66,8 +66,9 @@ public class Query4 {
         final long stateSize = params.getLong("state-size", 1_000_000);
         final long keySize = params.getLong("keys", 10000);
         final double skewness = params.getDouble("skewness", 1.0);
-        int warmUp = 6*60*1000;
+//        int warmUp = 6*60*1000;
 
+        int warmUp = 2*180*1000;
         final boolean groupAll = params.getBoolean("group-all", false);
         String groupJoin = "join", groupWin = "win";
         if (groupAll){
@@ -179,6 +180,8 @@ public class Query4 {
         public void flatMap2(Bid bid, Collector<Tuple2<Long, Long>> out) throws Exception {
             Tuple6<Long, Long, Long, Long, Long, String> auction = auctionMsg.value();
 //            delay(100_000);
+            if(bid.auction == 3)
+                delay(100_000);
             if(auction != null){
                 Tuple2<Long, Long> maxPrice = new Tuple2<>(auction.f1, -1L);
                 if(bid.dateTime > auction.f3 && bid.dateTime < auction.f4 && bid.price > auction.f2){
@@ -190,8 +193,8 @@ public class Query4 {
                 }
                 out.collect(maxPrice);
             } else {
-                if(bid.auction == 1)
-                    System.out.println("not found 1");
+//                if(bid.auction == 1)
+                    System.out.println("not found: " + bid.auction);
             }
         }
 

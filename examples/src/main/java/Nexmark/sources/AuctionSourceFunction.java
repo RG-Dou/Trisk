@@ -133,7 +133,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     private void warmup(SourceContext<Auction> ctx) throws InterruptedException {
         int curRate = rate + base; //  (sin0 + 1) * rate + base
-        curRate = 5000;
+        curRate = 500000;
         long startTs = System.currentTimeMillis();
         while ((System.currentTimeMillis() - startTs < warmUpInterval) && warmUp) {
             long emitStartTime = System.currentTimeMillis();
