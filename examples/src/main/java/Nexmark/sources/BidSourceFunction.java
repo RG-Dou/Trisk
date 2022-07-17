@@ -64,7 +64,7 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     }
 
     public BidSourceFunction(int base, long keys) {
-        this(base, keys, 400000);
+        this(base, keys, 1.0);
     }
 
     public BidSourceFunction(int base, long keys, double skewness){

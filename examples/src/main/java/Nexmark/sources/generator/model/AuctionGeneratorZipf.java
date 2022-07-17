@@ -39,7 +39,7 @@ public class AuctionGeneratorZipf implements Serializable {
      * Keep the number of categories small so the example queries will find results even with a small
      * batch of events.
      */
-    private static final int NUM_CATEGORIES = 1000;
+    private int NUM_CATEGORIES = 1000;
 
     /** Number of yet-to-be-created people and auction ids allowed. */
     private static final int AUCTION_ID_LEAD = 10;
@@ -74,8 +74,6 @@ public class AuctionGeneratorZipf implements Serializable {
 
         long id = lastBase0AuctionId(eventId) + GeneratorConfig.FIRST_AUCTION_ID;
         id = nextLong(random, keys);
-//        if(random.nextInt(2) == 0)
-//            id = 0;
 
         long seller;
         // Here P(auction will be for a hot seller) = 1 - 1/hotSellersRatio.
@@ -87,15 +85,9 @@ public class AuctionGeneratorZipf implements Serializable {
         }
         seller += GeneratorConfig.FIRST_PERSON_ID;
 
-//        seller = zipf.next();
-//        seller = random.nextInt((int) keys);
-
-//        seller = zipf.nextFromFile();
-
         long category = GeneratorConfig.FIRST_CATEGORY_ID + random.nextInt(NUM_CATEGORIES);
         long initialBid = nextPrice(random);
-//        long expires = timestamp + nextAuctionLengthMs(eventsCountSoFar, random, timestamp, config);
-        long expires = timestamp + 5000000;
+        long expires = timestamp + nextAuctionLengthMs(eventsCountSoFar, random, timestamp, config);
         String name = nextString(random, 20);
         String desc = nextString(random, 100);
         long reserve = initialBid + nextPrice(random);
@@ -251,5 +243,9 @@ public class AuctionGeneratorZipf implements Serializable {
 
     public void setParallel(int parallel) {
         this.parallel = parallel;
+    }
+
+    public void setNUM_CATEGORIES(int categories){
+        NUM_CATEGORIES = categories;
     }
 }

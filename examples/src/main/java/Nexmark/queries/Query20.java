@@ -60,26 +60,35 @@ public class Query20 {
         env.getConfig().setAutoWatermarkInterval(1);
         env.disableOperatorChaining();
 
-        final int auctionSrcRate = params.getInt("auction-srcRate", 20000);
+        final int auctionSrcRate = params.getInt("auction-srcRate", 1000);
         final int bidSrcRate = params.getInt("bid-srcRate", 1000);
-        final long stateSize = params.getLong("state-size", 60000);
-        final long keys = params.getLong("keys", 50000);
+        final long stateSize = params.getLong("state-size", 1_000_000);
+        final long keys = params.getLong("keys", 10000);
+        final double skewness = params.getDouble("skewness", 1.0);
 
-        DataStream<Auction> auctions = env.addSource(new AuctionSourceFunction(auctionSrcRate, stateSize, keys))
+        int warmUp = 2*180*1000;
+        final boolean groupAll = params.getBoolean("group-all", false);
+        String groupJoin = "join", groupFilter = "Filter";
+        if (groupAll){
+            groupJoin = "unified";
+            groupFilter = "unified";
+        }
+
+        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, keys, 0, warmUp);
+        auctionSrc.setSkewField("Warmup");
+        auctionSrc.setCategory(10);
+        BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keys, skewness, warmUp);
+        bidSrc.setSkewField("Auction");
+
+        DataStream<Auction> auctions = env.addSource(auctionSrc)
                 .name("Custom Source: Auctions")
-                .setParallelism(params.getInt("p-auction-source", 1)).slotSharingGroup("source")
-                .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).slotSharingGroup("source")
-                .filter(new FilterFunction<Auction>() {
-                    @Override
-                    public boolean filter(Auction auction) throws Exception {
-                        return auction.category == 10;
-                    }
-                }).slotSharingGroup("source");
+                .setParallelism(params.getInt("p-auction-source", 1)).slotSharingGroup(groupJoin)
+                .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).slotSharingGroup(groupJoin);
 
-        DataStream<Bid> bids = env.addSource(new BidSourceFunction(bidSrcRate, keys))
+        DataStream<Bid> bids = env.addSource(bidSrc)
                 .name("Custom Source: Bids")
-                .setParallelism(params.getInt("p-bid-source", 1)).slotSharingGroup("source")
-                .assignTimestampsAndWatermarks(new BidTimestampAssigner()).slotSharingGroup("source");
+                .setParallelism(params.getInt("p-bid-source", 1)).slotSharingGroup(groupJoin)
+                .assignTimestampsAndWatermarks(new BidTimestampAssigner()).slotSharingGroup(groupJoin);
 
         // SELECT
         //      auction, bidder, price, channel, url, B.dataTime, B.extra,
@@ -105,18 +114,19 @@ public class Query20 {
                 });
 
         DataStream<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> joined = keyedAuctions.connect(keyedBids)
-                .flatMap(new JoinBidsWithAuctions()).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup("join");
+                .flatMap(new JoinBidsWithAuctions()).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup(groupJoin);
 
-        DataStream<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> flatMap = joined.flatMap(new FlatMapFunction<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>, Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>>() {
-            @Override
-            public void flatMap(Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>value, Collector<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> collector) throws Exception {
-                collector.collect(value);
-            }
-        }).name("Simple FlapMap").setParallelism(params.getInt("p-sink", 1)).slotSharingGroup("sink");
+        DataStream<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> flatMap = joined
+                .filter(new FilterFunction<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>>() {
+                    @Override
+                    public boolean filter(Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> joinTuple) throws Exception {
+                        return joinTuple.f12 == 10;
+                    }
+                }).slotSharingGroup(groupFilter);
 
         GenericTypeInfo<Object> objectTypeInfo = new GenericTypeInfo<>(Object.class);
         flatMap.transform("Sink", objectTypeInfo, new DummyLatencyCountingSinkOutput<>(logger))
-                .setParallelism(params.getInt("p-sink", 1)).slotSharingGroup("sink");
+                .setParallelism(params.getInt("p-sink", 1)).slotSharingGroup(groupFilter);
 
         // execute program
         env.execute("Nexmark Query");
@@ -126,7 +136,6 @@ public class Query20 {
 
         // We only store auction message, since in practice, there should be an auction first, followed by bids
         private ValueState<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>> auctionMsg;
-        private int taskIndex;
 
         @Override
         public void open(Configuration parameters) throws Exception {
@@ -136,7 +145,6 @@ public class Query20 {
                             TypeInformation.of(new TypeHint<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>>() {})
                     );
             auctionMsg = getRuntimeContext().getState(auctionDescriptor);
-            taskIndex = getRuntimeContext().getIndexOfThisSubtask();
         }
 
         @Override
@@ -152,7 +160,7 @@ public class Query20 {
         @Override
         public void flatMap2(Bid bid, Collector<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> out) throws Exception {
             Tuple9<String, String, Long, Long, Long, Long, Long, Long, String> auction = auctionMsg.value();
-            if(bid.auction == 100)
+            if(bid.auction == 0)
                 delay(500_000);
             if(auction != null) {
                 Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> tuple =

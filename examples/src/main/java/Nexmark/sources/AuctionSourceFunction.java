@@ -123,7 +123,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
                 count = 0;
             }
 
-            sendEvents(ctx, curRate);
+            sendEvents(ctx, curRate, "");
 
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
@@ -138,13 +138,13 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         while ((System.currentTimeMillis() - startTs < warmUpInterval) && warmUp) {
             long emitStartTime = System.currentTimeMillis();
 
-            sendEvents(ctx, curRate);
+            sendEvents(ctx, curRate, skewField);
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
         }
     }
 
-    private void sendEvents(SourceContext<Auction> ctx, int curRate){
+    private void sendEvents(SourceContext<Auction> ctx, int curRate, String field){
 
         for (int i = 0; i < curRate / 20; i++) {
             long nextId = nextId();
@@ -157,7 +157,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
 //                ctx.collect(AuctionGenerator.nextAuction(eventsCountSoFar, nextId, rnd, eventTimestamp, config));
             Auction auction;
-            if(Objects.equals(skewField, "Warmup")){
+            if(Objects.equals(field, "Warmup")){
                 auction = generatorZipf.nextAuctionWarmup(eventsCountSoFar, nextId, rnd, DateTime.now().getMillis(), config);
                 if (auction == null) {
                     System.out.println("Stop warm up");
@@ -165,7 +165,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
                     skewField = "";
                     return;
                 }
-            } else if(Objects.equals(skewField, "Seller")) {
+            } else if(Objects.equals(field, "Seller")) {
                 auction = generatorZipf.nextAuctionSellSkew(eventsCountSoFar, nextId, rnd, DateTime.now().getMillis(), config);
             } else {
                 auction=generatorZipf.nextAuction(eventsCountSoFar, nextId, rnd, DateTime.now().getMillis(), config);
@@ -188,5 +188,9 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     public void setSkewField(String skewField) {
         this.skewField = skewField;
+    }
+
+    public void setCategory(int category){
+        generatorZipf.setNUM_CATEGORIES(category);
     }
 }
