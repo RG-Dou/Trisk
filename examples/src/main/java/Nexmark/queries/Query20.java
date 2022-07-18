@@ -122,11 +122,11 @@ public class Query20 {
                     public boolean filter(Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> joinTuple) throws Exception {
                         return joinTuple.f12 == 10;
                     }
-                }).slotSharingGroup(groupFilter);
+                }).setParallelism(params.getInt("p-filter", 1)).slotSharingGroup(groupFilter);
 
         GenericTypeInfo<Object> objectTypeInfo = new GenericTypeInfo<>(Object.class);
         flatMap.transform("Sink", objectTypeInfo, new DummyLatencyCountingSinkOutput<>(logger))
-                .setParallelism(params.getInt("p-sink", 1)).slotSharingGroup(groupFilter);
+                .setParallelism(params.getInt("p-filter", 1)).slotSharingGroup(groupFilter);
 
         // execute program
         env.execute("Nexmark Query");
