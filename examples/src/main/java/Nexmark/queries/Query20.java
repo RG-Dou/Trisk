@@ -56,7 +56,7 @@ public class Query20 {
 
         // set up the execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(10);
+        env.enableCheckpointing(100);
         env.getConfig().setAutoWatermarkInterval(1);
         env.disableOperatorChaining();
 
