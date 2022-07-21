@@ -327,6 +327,8 @@ public class RestfulMetricsRetriever {
 		for(JSONObject item : response){
 			value = item.getDouble("value");
 		}
+		if(value == null || value.isNaN())
+			value = 0.0;
 		return value;
 	}
 

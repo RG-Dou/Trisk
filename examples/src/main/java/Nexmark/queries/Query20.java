@@ -161,7 +161,7 @@ public class Query20 {
         public void flatMap2(Bid bid, Collector<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> out) throws Exception {
             Tuple9<String, String, Long, Long, Long, Long, Long, Long, String> auction = auctionMsg.value();
             if(bid.auction == 0)
-                delay(500_000);
+                delay(1_000_000);
             if(auction != null) {
                 Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> tuple =
                         new Tuple14<>(bid.auction, bid.bidder, bid.price, bid.dateTime, bid.extra,
