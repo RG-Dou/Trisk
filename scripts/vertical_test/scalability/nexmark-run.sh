@@ -9,6 +9,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 ### ### ###  		   ### ### ###
 
+# query (1), parallelism (2)，total memory (3), controller (4), group (5), source_rate (6), try_counter (7)
 init() {
   # app level
   DATA_ROOT="/home/drg/projects/work3/flink"
@@ -33,12 +34,12 @@ init() {
 
   AUCTION_S=0
   PERSON_S=3000
-  BID_S=$4
+  BID_S=$6
   STATE_SIZE=100000
   KEY_SIZE=50000
   SKEWNESS=1
 
-  PP=4
+  PP=$2
   AUCTION_P=${PP}
   PERSON_P=${PP}
   BID_P=${PP}
@@ -47,15 +48,17 @@ init() {
   FILTER_P=${PP}
 
   runtime=1200
-  totalCachePerTM=500
+  totalCachePerTM=$3
   # Controller="BlankController"
   # Group="true"
   # Controller="ElasticMemoryManager"
   # Group="false"
-  Controller=$2
-  Group=$3
-  Try=$5
-  SUB_DIR=$Controller+$Group+$Try
+  Controller=$4
+  Group=$5
+  Try=$7
+
+  SUB_DIR1=$PP+$totalCachePerTM
+  SUB_DIR2=$BID_S+$Controller+$Group+$Try
 
   ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
   ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
@@ -83,12 +86,12 @@ function mvRocksdbLog() {
     if [[ ! -d ${DATA_DIR} ]]; then
             mkdir ${DATA_DIR}
     fi
-    mkdir ${DATA_DIR}/${BID_S}
-    if [[ -d ${DATA_DIR}/${BID_S}/${SUB_DIR} ]]; then
+    mkdir ${DATA_DIR}/${SUB_DIR1}
+    if [[ -d ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2} ]]; then
             # shellcheck disable=SC2115
-            rm -rf ${DATA_DIR}/${BID_S}/${SUB_DIR}
+            rm -rf ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
     fi
-    mkdir ${DATA_DIR}/${BID_S}/${SUB_DIR}
+    mkdir ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
 #    mv ${ROCKSDB_LOG_DIR}* ${DATA_DIR}/${totalCachePerTM}/${simpleTest}
 #    for entry in ${ROCKSDB_LOG_DIR}*
 #    do
@@ -115,8 +118,8 @@ function cleanEnv() {
 #      rm -rf ${FLINK_DIR}${EXP_NAME}
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
-  mv ${FLINK_DIR}log/* ${DATA_DIR}/${BID_S}/${SUB_DIR}
-  mv ${LATENCY_DIR}* ${DATA_DIR}/${BID_S}/${SUB_DIR}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
@@ -194,6 +197,7 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5
+# query (1), parallelism (2)，total memory (3), controller (4), group (5), source_rate (6), try_counter (7)
+init $1 $2 $3 $4 $5 $6 $7
 run_one_exp
 #test

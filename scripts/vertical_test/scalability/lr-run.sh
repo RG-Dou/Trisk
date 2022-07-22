@@ -9,6 +9,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 ### ### ###  		   ### ### ###
 
+# parallelism (1)，total memory (2), controller (3), group (4), source_rate (5), try_counter (6)
 init() {
   # app level
   DATA_ROOT="/home/drg/projects/work3/flink"
@@ -16,45 +17,23 @@ init() {
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
   readonly SAVEPOINT_PATH="/home/drg/projects/work3/temp/"
-  if [[ "$1" = "q3" ]]; then
-    JOB="Nexmark.queries.Query3Stateful"
-  elif [[ "$1" = "q3window" ]]; then
-    JOB="Nexmark.queries.Query3StatefulWindow"
-  elif [[ "$1" = "q5" ]]; then
-    JOB="Nexmark.queries.Query5Keyed"
-  elif [[ "$1" = "q8" ]]; then
-    JOB="Nexmark.queries.Query8Keyed"
-  elif [[ "$1" = "q20" ]]; then
-    JOB="Nexmark.queries.Query20"
-  elif [[ "$1" = "q4" ]]; then
-    JOB="Nexmark.queries.Query4"
-  fi
-  EXP_NAME="nexmark-$1"
+  JOB="linearRoad.DailyExpenditure"
+  EXP_NAME="DailyExpenditure"
 
-  AUCTION_S=0
-  PERSON_S=3000
-  BID_S=$4
+  FILE_PATH="${DATA_ROOT}/histData/hist_lite.out"
+  REQUEST_S=$5
   STATE_SIZE=100000
-  KEY_SIZE=50000
   SKEWNESS=1
 
-  PP=4
-  AUCTION_P=${PP}
-  PERSON_P=${PP}
-  BID_P=${PP}
-  JOIN_P=${PP}
-  WIN_P=${PP}
+  PP=$1
+  STATE_P=${PP}
   FILTER_P=${PP}
 
   runtime=1200
-  totalCachePerTM=500
-  # Controller="BlankController"
-  # Group="true"
-  # Controller="ElasticMemoryManager"
-  # Group="false"
-  Controller=$2
-  Group=$3
-  Try=$5
+  totalCachePerTM=$2
+  Controller=$3
+  Group=$4
+  Try=$6
   SUB_DIR=$Controller+$Group+$Try
 
   ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
@@ -63,8 +42,6 @@ init() {
   ROCKSDB_DATA="${ROCKSDB_DIR}/localdir/"
   rm -rf ${ROCKSDB_DATA}*
   DATA_DIR="${DATA_ROOT}/data/${EXP_NAME}"
-#  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/queue_delay"
-#  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/state_size/${readCount}"
 #  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
 #  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 }
@@ -83,17 +60,12 @@ function mvRocksdbLog() {
     if [[ ! -d ${DATA_DIR} ]]; then
             mkdir ${DATA_DIR}
     fi
-    mkdir ${DATA_DIR}/${BID_S}
-    if [[ -d ${DATA_DIR}/${BID_S}/${SUB_DIR} ]]; then
+    mkdir ${DATA_DIR}/${REQUEST_S}
+    if [[ -d ${DATA_DIR}/${REQUEST_S}/${SUB_DIR} ]]; then
             # shellcheck disable=SC2115
-            rm -rf ${DATA_DIR}/${BID_S}/${SUB_DIR}
+            rm -rf ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
     fi
-    mkdir ${DATA_DIR}/${BID_S}/${SUB_DIR}
-#    mv ${ROCKSDB_LOG_DIR}* ${DATA_DIR}/${totalCachePerTM}/${simpleTest}
-#    for entry in ${ROCKSDB_LOG_DIR}*
-#    do
-#      echo "$entry"
-#    done
+    mkdir ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
     echo "INFO: move rocksdb Log"
 
 }
@@ -115,8 +87,8 @@ function cleanEnv() {
 #      rm -rf ${FLINK_DIR}${EXP_NAME}
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
-  mv ${FLINK_DIR}log/* ${DATA_DIR}/${BID_S}/${SUB_DIR}
-  mv ${LATENCY_DIR}* ${DATA_DIR}/${BID_S}/${SUB_DIR}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
@@ -145,30 +117,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -request-rate ${REQUEST_S} -p-state ${STATE_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -hist-file ${FILE_PATH} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &
-}
-
-function runGenerator() {
-  echo "INFO: java -cp ${FLINK_APP_DIR}target/testbed-1.0-SNAPSHOT.jar kafkagenerator.StockGenerator > /dev/null 2>&1 &"
-  java -cp ${FLINK_APP_DIR}target/testbed-1.0-SNAPSHOT.jar kafkagenerator.StockGenerator > /dev/null 2>&1 &
-}
-
-# run applications
-function reconfigApp() {
-  JOB_ID=$(cat nohup.out | sed -n '1p' | rev | cut -d' ' -f 1 | rev)
-  JOB_ID=$(echo $JOB_ID |tr -d '\n')
-  echo "INFO: running job: $JOB_ID"
-
-  savepointPathStr=$($FLINK cancel -s $SAVEPOINT_PATH $JOB_ID)
-  savepointFile=$(echo $savepointPathStr| rev | cut -d'/' -f 1 | rev)
-  x=$(echo $savepointFile |tr -d '.')
-  x=$(echo $x |tr -d '\n')
-
-  rm nohup.out
-  echo "INFO: RECOVER $FLINK run -d -s $SAVEPOINT_PATH$x -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-join ${JOIN_P} &"
-  nohup $FLINK run -d -s $SAVEPOINT_PATH$x --class $JOB $JAR  -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-join ${JOIN_P} &
+  nohup $FLINK run -c ${JOB} ${JAR} -request-rate ${REQUEST_S} -p-state ${STATE_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -hist-file ${FILE_PATH} &
 }
 
 # run one flink demo exp, which is a word count job
@@ -194,6 +145,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5
+init $1 $2 $3 $4 $5 $6
 run_one_exp
 #test

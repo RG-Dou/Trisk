@@ -11,14 +11,15 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 init() {
   # app level
-  LATENCY_DIR="/home/drg/projects/work3/flink/data/trisk/"
+  DATA_ROOT="/home/drg/projects/work3/flink"
+  LATENCY_DIR="${DATA_ROOT}/data/trisk/"
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
   readonly SAVEPOINT_PATH="/home/drg/projects/work3/temp/"
   JOB="linearRoad.DailyExpenditure"
   EXP_NAME="DailyExpenditure"
 
-  FILE_PATH="/home/drg/projects/work3/flink/histData/hist_lite.out"
+  FILE_PATH="${DATA_ROOT}/histData/hist_lite.out"
   REQUEST_S=$3
   STATE_SIZE=100000
   SKEWNESS=1
@@ -34,12 +35,12 @@ init() {
   Try=$4
   SUB_DIR=$Controller+$Group+$Try
 
-  ROCKSDB_DIR="/home/drg/projects/work3/flink/rocksdb-storage"
+  ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
   ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
   ROCKSDB_CHECKPOINT=${ROCKSDB_DIR}"/checkpoint/"
-  ROCKSDB_DATA="/home/drg/projects/work3/flink/rocksdb-storage/localdir/"
+  ROCKSDB_DATA="${ROCKSDB_DIR}/localdir/"
   rm -rf ${ROCKSDB_DATA}*
-  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}"
+  DATA_DIR="${DATA_ROOT}/data/${EXP_NAME}"
 #  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
 #  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 }
