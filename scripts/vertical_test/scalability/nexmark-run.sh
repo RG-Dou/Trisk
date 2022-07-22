@@ -196,6 +196,6 @@ test() {
 }
 
 # query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9)
-init $1 $2 $3 $4 $5 $6 $7 $8 &9
+init $1 $2 $3 $4 $5 $6 $7 $8 $9
 run_one_exp
 #test
