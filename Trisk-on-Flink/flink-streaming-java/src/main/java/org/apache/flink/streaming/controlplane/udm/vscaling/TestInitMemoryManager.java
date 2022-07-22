@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class TestInitMemoryManager extends AbstractMemoryManager {
-	private static final Logger LOG = LoggerFactory.getLogger(ElasticMemoryManager.class);
+	private static final Logger LOG = LoggerFactory.getLogger(TestInitMemoryManager.class);
 
 	private final TestingThread testingThread;
 	private final String SIMPLE_TEST = "trisk.simple_test";

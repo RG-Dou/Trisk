@@ -9,10 +9,10 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 ### ### ###  		   ### ### ###
 
-# query (1), parallelism (2)，total memory (3), controller (4), group (5), source_rate (6), try_counter (7)
+# query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9)
 init() {
   # app level
-  DATA_ROOT="/home/drg/projects/work3/flink"
+  DATA_ROOT="/data/EMM_data"
   LATENCY_DIR="${DATA_ROOT}/data/trisk/"
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
@@ -34,9 +34,11 @@ init() {
 
   AUCTION_S=0
   PERSON_S=3000
-  BID_S=$6
-  STATE_SIZE=100000
-  KEY_SIZE=50000
+  BID_S=$8
+  STATE_SIZE=$4
+  KEY_SIZE=$5
+#  STATE_SIZE=100000
+#  KEY_SIZE=50000
   SKEWNESS=1
 
   PP=$2
@@ -49,13 +51,9 @@ init() {
 
   runtime=1200
   totalCachePerTM=$3
-  # Controller="BlankController"
-  # Group="true"
-  # Controller="ElasticMemoryManager"
-  # Group="false"
-  Controller=$4
-  Group=$5
-  Try=$7
+  Controller=$6
+  Group=$7
+  Try=$9
 
   SUB_DIR1=$PP+$totalCachePerTM
   SUB_DIR2=$BID_S+$Controller+$Group+$Try
@@ -79,7 +77,7 @@ function configApp() {
 #    sed -ri "s|(taskmanager.memory.managed.fraction: 0.)[0-9]*|taskmanager.memory.managed.fraction: 0.$totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
     sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
 #    sed -i "s/^\(trisk.simple_test: \)\(true\|false\)/\1${simpleTest}/"  ${FLINK_DIR}conf/flink-conf.yaml
-    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
+    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\|TestInitMemoryManager\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
 }
 
 function mvRocksdbLog() {
@@ -197,7 +195,7 @@ test() {
   mvRocksdbLog
 }
 
-# query (1), parallelism (2)，total memory (3), controller (4), group (5), source_rate (6), try_counter (7)
-init $1 $2 $3 $4 $5 $6 $7
+# query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9)
+init $1 $2 $3 $4 $5 $6 $7 $8 &9
 run_one_exp
 #test
