@@ -65,6 +65,7 @@ public class Query20 {
         final long stateSize = params.getLong("state-size", 1_000_000);
         final long keys = params.getLong("keys", 10000);
         final double skewness = params.getDouble("skewness", 1.0);
+        final boolean inputRateSpy = params.getBoolean("input-spy", false);
 
         int warmUp = 2*180*1000;
         final boolean groupAll = params.getBoolean("group-all", false);
@@ -79,6 +80,7 @@ public class Query20 {
         auctionSrc.setCategory(10);
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keys, skewness, warmUp);
         bidSrc.setSkewField("Auction");
+        if (inputRateSpy) bidSrc.enableInputRateSpy();
 
         DataStream<Auction> auctions = env.addSource(auctionSrc)
                 .name("Custom Source: Auctions")

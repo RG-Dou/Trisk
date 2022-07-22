@@ -9,7 +9,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 ### ### ###  		   ### ### ###
 
-# query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9)
+# query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9), input_spy(10)
 init() {
   # app level
   DATA_ROOT="/data/EMM_data"
@@ -54,6 +54,7 @@ init() {
   Controller=$6
   Group=$7
   Try=$9
+  SPY=${10}
 
   SUB_DIR1=$PP+$totalCachePerTM
   SUB_DIR2=$BID_S+$Controller+$Group+$Try
@@ -146,9 +147,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} --input-spy ${SPY} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &
+  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} --input-spy ${SPY} &
 }
 
 function runGenerator() {
@@ -195,7 +196,7 @@ test() {
   mvRocksdbLog
 }
 
-# query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9)
-init $1 $2 $3 $4 $5 $6 $7 $8 $9
+# query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9), input_spy(10)
+init $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10}
 run_one_exp
 #test

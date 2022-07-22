@@ -9,7 +9,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 ### ### ###  		   ### ### ###
 
-# parallelism (1)，total memory (2), state_size(3), controller (4), group (5), source_rate (6), try_counter (7)
+# parallelism (1)，total memory (2), state_size(3), controller (4), group (5), source_rate (6), try_counter (7), input_spy(8)
 init() {
   # app level
   DATA_ROOT="/data/EMM_data"
@@ -35,6 +35,7 @@ init() {
   Controller=$4
   Group=$5
   Try=$7
+  SPY=$8
 
   SUB_DIR1=$PP+$totalCachePerTM
   SUB_DIR2=$REQUEST_S+$Controller+$Group+$Try
@@ -120,9 +121,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -request-rate ${REQUEST_S} -p-state ${STATE_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -hist-file ${FILE_PATH} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -request-rate ${REQUEST_S} -p-state ${STATE_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -hist-file ${FILE_PATH} --input-spy ${SPY} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -request-rate ${REQUEST_S} -p-state ${STATE_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -hist-file ${FILE_PATH} &
+  nohup $FLINK run -c ${JOB} ${JAR} -request-rate ${REQUEST_S} -p-state ${STATE_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -hist-file ${FILE_PATH} --input-spy ${SPY} &
 }
 
 # run one flink demo exp, which is a word count job
@@ -148,6 +149,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5 $6 $7
+init $1 $2 $3 $4 $5 $6 $7 $8
 run_one_exp
 #test

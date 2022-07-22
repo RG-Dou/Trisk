@@ -116,8 +116,8 @@ public class TestInitMemoryManager extends AbstractMemoryManager {
 		@Override
 		public void run() {
 
-			LOG.info("Blank Controller Test");
-			System.out.println("Blank Controller Test");
+			LOG.info("Init Memory Manager Test");
+			System.out.println("Init Memory Manager Test");
 
 			try {
 				// todo, if the time of sleep is too short, may cause receiving not belong key

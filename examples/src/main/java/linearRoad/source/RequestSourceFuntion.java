@@ -30,6 +30,7 @@ public class RequestSourceFuntion extends RichParallelSourceFunction<DERequestOr
     private double skewness;
     private long skewKeys;
     private String filePath;
+    private Boolean inputRateSpy = false;
 
     private int qidCurrent = 0;
     private static final RandomDataGenerator dataGen = new RandomDataGenerator();
@@ -82,6 +83,7 @@ public class RequestSourceFuntion extends RichParallelSourceFunction<DERequestOr
 
         // warm up
         long now = System.currentTimeMillis();
+        long newStartTs = now;
         if(getRuntimeContext().getIndexOfThisSubtask() == 0)
             sendHistoricalData(ctx);
         long duration = System.currentTimeMillis() - now;
@@ -102,6 +104,13 @@ public class RequestSourceFuntion extends RichParallelSourceFunction<DERequestOr
             }
 
             sendEvents(ctx, curRate, "");
+
+            if(inputRateSpy) {
+                if(System.currentTimeMillis() - newStartTs >= 60*1000){
+                    newStartTs = System.currentTimeMillis();
+                    base = base + 50;
+                }
+            }
 
             // Sleep for the rest of timeslice if needed
             Util.pause(emitStartTime);
@@ -195,6 +204,10 @@ public class RequestSourceFuntion extends RichParallelSourceFunction<DERequestOr
 
     public void setFilePath(String filePath){
         this.filePath = filePath;
+    }
+
+    public void enableInputRateSpy(){
+        this.inputRateSpy = true;
     }
 
 }

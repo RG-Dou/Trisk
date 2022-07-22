@@ -49,6 +49,7 @@ public class DailyExpenditure {
 
         final int stateSize = params.getInt("state-size", 1_00_000);
         final double skewness = params.getDouble("skewness", 1.0);
+        final boolean inputRateSpy = params.getBoolean("input-spy", false);
 //
 //        int warmUp = 2*180*1000;
         final boolean groupAll = params.getBoolean("group-all", false);
@@ -61,6 +62,7 @@ public class DailyExpenditure {
         long keys = 10;
         RequestSourceFuntion requestSrc = new RequestSourceFuntion(requestRate, keys);
         requestSrc.setFilePath(histFilePath);
+        if (inputRateSpy) requestSrc.enableInputRateSpy();
 
         DataStream<DERequestOrHistData> requests = env.addSource(requestSrc)
                 .name("Custom Source: Request")

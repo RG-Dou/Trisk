@@ -46,6 +46,7 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     private String skewField;
 
     private String skewFieldWarm;
+    private Boolean inputRateSpy = false;
 
     public BidSourceFunction(int srcRate) {
         this(srcRate, 0);
@@ -118,10 +119,12 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
                     count = 0;
                 }
 
-//                if(System.currentTimeMillis() - newStartTs >= 60*1000){
-//                    newStartTs = System.currentTimeMillis();
-//                    base = base + 200;
-//                }
+                if(inputRateSpy) {
+                    if(System.currentTimeMillis() - newStartTs >= 60*1000){
+                        newStartTs = System.currentTimeMillis();
+                        base = base + 50;
+                    }
+                }
 
                 sendEvents(ctx, curRate, skewField);
                 count++;
@@ -180,5 +183,9 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
 
     public void setSkewFieldWarm(String skewFieldWarm) {
         this.skewFieldWarm = skewFieldWarm;
+    }
+
+    public void enableInputRateSpy(){
+        this.inputRateSpy = true;
     }
 }
