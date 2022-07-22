@@ -12,7 +12,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 # parallelism (1)，total memory (2), state_size(3), controller (4), group (5), source_rate (6), try_counter (7)
 init() {
   # app level
-  DATA_ROOT="/home/drg/projects/work3/flink"
+  DATA_ROOT="/data/EMM_data"
   LATENCY_DIR="${DATA_ROOT}/data/trisk/"
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
