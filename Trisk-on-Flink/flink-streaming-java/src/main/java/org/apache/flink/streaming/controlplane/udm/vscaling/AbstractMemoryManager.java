@@ -20,7 +20,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 // ToDo: comments and logs
 public abstract class AbstractMemoryManager extends AbstractController {
-	private static final Logger LOG = LoggerFactory.getLogger(ElasticMemoryManager.class);
+	private static final Logger LOG = LoggerFactory.getLogger(AbstractMemoryManager.class);
 
 	public final Object object = new Object();
 	public final RestfulMetricsRetriever mRetriever;

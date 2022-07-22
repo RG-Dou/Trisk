@@ -1,13 +1,18 @@
 # by default
 
 # test
-bash nexmark-run.sh q4 8 512 BlankController false 500 1
+bash nexmark-run.sh q4 8 350 100000 100000 TestInitMemoryManager true 500 1
 
-APP="q4 q20 Daily"
+function testInitMem() {
+#  query (1), parallelism (2)，total memory (3), state_size (4), key_size(5), controller (6), group (7), source_rate (8), try_counter (9)
+  bash nexmark-run.sh q4 8 350 100000 100000 TestInitMemoryManager true 500 1
+  bash nexmark-run.sh q20 8 350 100000 100000 TestInitMemoryManager true 500 1
 
-# test memory
-bash nexmark-run.sh q4 8
+# parallelism (1)，total memory (2), state_size(3), controller (4), group (5), source_rate (6), try_counter (7)
+  bash lr-run.sh 8 350 200000 TestInitMemoryManager true 500 1
+}
 
+testInitMem
 
 
 #rates="2000"

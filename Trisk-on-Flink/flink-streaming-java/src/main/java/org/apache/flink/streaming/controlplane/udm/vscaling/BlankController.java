@@ -20,7 +20,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 // ToDo: comments and logs
 public class BlankController extends AbstractMemoryManager {
-	private static final Logger LOG = LoggerFactory.getLogger(ElasticMemoryManager.class);
+	private static final Logger LOG = LoggerFactory.getLogger(BlankController.class);
 
 	private final TestingThread testingThread;
 	private final String SIMPLE_TEST = "trisk.simple_test";

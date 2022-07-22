@@ -9,7 +9,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 ### ### ###  		   ### ### ###
 
-# parallelism (1)，total memory (2), controller (3), group (4), source_rate (5), try_counter (6)
+# parallelism (1)，total memory (2), state_size(3), controller (4), group (5), source_rate (6), try_counter (7)
 init() {
   # app level
   DATA_ROOT="/home/drg/projects/work3/flink"
@@ -21,8 +21,9 @@ init() {
   EXP_NAME="DailyExpenditure"
 
   FILE_PATH="${DATA_ROOT}/histData/hist_lite.out"
-  REQUEST_S=$5
-  STATE_SIZE=100000
+  REQUEST_S=$6
+#  STATE_SIZE=100000
+  STATE_SIZE=$3
   SKEWNESS=1
 
   PP=$1
@@ -31,10 +32,12 @@ init() {
 
   runtime=1200
   totalCachePerTM=$2
-  Controller=$3
-  Group=$4
-  Try=$6
-  SUB_DIR=$Controller+$Group+$Try
+  Controller=$4
+  Group=$5
+  Try=$7
+
+  SUB_DIR1=$PP+$totalCachePerTM
+  SUB_DIR2=$REQUEST_S+$Controller+$Group+$Try
 
   ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
   ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
@@ -53,19 +56,19 @@ function configApp() {
 #    sed -ri "s|(taskmanager.memory.managed.fraction: 0.)[0-9]*|taskmanager.memory.managed.fraction: 0.$totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
     sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
 #    sed -i "s/^\(trisk.simple_test: \)\(true\|false\)/\1${simpleTest}/"  ${FLINK_DIR}conf/flink-conf.yaml
-    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
+    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\|TestInitMemoryManager\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
 }
 
 function mvRocksdbLog() {
     if [[ ! -d ${DATA_DIR} ]]; then
             mkdir ${DATA_DIR}
     fi
-    mkdir ${DATA_DIR}/${REQUEST_S}
-    if [[ -d ${DATA_DIR}/${REQUEST_S}/${SUB_DIR} ]]; then
+    mkdir ${DATA_DIR}/${SUB_DIR1}
+    if [[ -d ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2} ]]; then
             # shellcheck disable=SC2115
-            rm -rf ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+            rm -rf ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
     fi
-    mkdir ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+    mkdir ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
     echo "INFO: move rocksdb Log"
 
 }
@@ -87,8 +90,8 @@ function cleanEnv() {
 #      rm -rf ${FLINK_DIR}${EXP_NAME}
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
-  mv ${FLINK_DIR}log/* ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
-  mv ${LATENCY_DIR}* ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
@@ -145,6 +148,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5 $6
+init $1 $2 $3 $4 $5 $6 $7
 run_one_exp
 #test

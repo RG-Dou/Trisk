@@ -69,6 +69,7 @@ import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamMa
 import org.apache.flink.streaming.controlplane.udm.*;
 import org.apache.flink.streaming.controlplane.udm.vscaling.BlankController;
 import org.apache.flink.streaming.controlplane.udm.vscaling.ElasticMemoryManager;
+import org.apache.flink.streaming.controlplane.udm.vscaling.TestInitMemoryManager;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -213,6 +214,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				break;
 			case "BlankController":
 				this.controlPolicyList.put("BlankController", new BlankController(this, streamManagerConfiguration.getConfiguration()));
+				break;
+			case "TestInitMemoryManager":
+				this.controlPolicyList.put("TestInitMemoryManager", new TestInitMemoryManager(this, streamManagerConfiguration.getConfiguration()));
 				break;
 		}
 
