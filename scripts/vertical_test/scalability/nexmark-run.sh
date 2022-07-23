@@ -31,6 +31,7 @@ init() {
     JOB="Nexmark.queries.Query4"
   fi
   EXP_NAME="nexmark-$1"
+  slaves="camel"
 
   AUCTION_S=0
   PERSON_S=3000
@@ -121,11 +122,22 @@ function cleanEnv() {
   mv ${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
+  for slave in ${slaves}; do
+    scp -r ${slave}:${FLINK_DIR}log/* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
+    scp -r ${slave}:${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
+    ssh ${slave} 'rm -rf ${slave}:${FLINK_DIR}log/*'
+    ssh ${slave} 'rm -rf ${LATENCY_DIR}*'
+    ssh ${slave} 'rm -rf /tmp/flink*'
+  done
 }
 
 function cleanRocksdbLog() {
     rm -rf ${ROCKSDB_LOG_DIR}*
     rm -rf ${ROCKSDB_CHECKPOINT}*
+    for slave in ${slaves}; do
+      ssh ${slave} 'rm -rf ${ROCKSDB_LOG_DIR}*'
+      ssh ${slave} 'rm -rf ${ROCKSDB_CHECKPOINT}*'
+    done
 }
 
 # clsoe flink clsuter
