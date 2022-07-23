@@ -125,9 +125,7 @@ function cleanEnv() {
   for slave in ${slaves}; do
     scp -r ${slave}:${FLINK_DIR}log/* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
     scp -r ${slave}:${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
-    ssh ${slave} 'rm -rf ${slave}:${FLINK_DIR}log/*'
-    ssh ${slave} 'rm -rf ${LATENCY_DIR}*'
-    ssh ${slave} 'rm -rf /tmp/flink*'
+    ssh ${slave} "bash ${DATA_ROOT}/clean-after.sh"
   done
 }
 
@@ -135,8 +133,7 @@ function cleanRocksdbLog() {
     rm -rf ${ROCKSDB_LOG_DIR}*
     rm -rf ${ROCKSDB_CHECKPOINT}*
     for slave in ${slaves}; do
-      ssh ${slave} 'rm -rf ${ROCKSDB_LOG_DIR}*'
-      ssh ${slave} 'rm -rf ${ROCKSDB_CHECKPOINT}*'
+      ssh ${slave} "bash ${DATA_ROOT}/clean-before.sh"
     done
 }
 
