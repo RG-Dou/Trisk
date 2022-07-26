@@ -25,6 +25,7 @@ init() {
 #  STATE_SIZE=100000
   STATE_SIZE=$3
   SKEWNESS=1
+  slaves="camel"
 
   PP=$1
   STATE_P=${PP}
@@ -95,11 +96,19 @@ function cleanEnv() {
   mv ${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
+  for slave in ${slaves}; do
+    scp -r ${slave}:${FLINK_DIR}log/* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
+    scp -r ${slave}:${LATENCY_DIR}* ${DATA_DIR}/${SUB_DIR1}/${SUB_DIR2}
+    ssh ${slave} "bash ${DATA_ROOT}/clean-after.sh"
+  done
 }
 
 function cleanRocksdbLog() {
     rm -rf ${ROCKSDB_LOG_DIR}*
     rm -rf ${ROCKSDB_CHECKPOINT}*
+    for slave in ${slaves}; do
+      ssh ${slave} "bash ${DATA_ROOT}/clean-before.sh"
+    done
 }
 
 # clsoe flink clsuter
