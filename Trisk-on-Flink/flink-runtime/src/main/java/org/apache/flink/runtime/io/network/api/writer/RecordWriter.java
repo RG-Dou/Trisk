@@ -200,11 +200,13 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 		targetPartition.flushAll();
 
 		try {
-			metricsManager.outputBufferFull(System.nanoTime());
+			if(metricsManager != null)
+				metricsManager.outputBufferFull(System.nanoTime());
 		} catch (Exception e) {
 			long start = System.nanoTime();
 			while (System.nanoTime() - start < 1000000000) {}
-			metricsManager.outputBufferFull(System.nanoTime());
+			if(metricsManager != null)
+				metricsManager.outputBufferFull(System.nanoTime());
 		}
 	}
 
