@@ -142,7 +142,10 @@ public class RestfulMetricsRetriever {
 				// 1. get state access time
 				String tag = this.metrics.getStateAccessTimeTag(operatorId);
 				String metricsIDSATime = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + tag + "_mean";
-				metrics.setAccessTime(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsIDSATime) / 1000000.0);
+				Double accessTime = getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsIDSATime);
+				if (accessTime != null) {
+					metrics.setAccessTime(operatorId, subTaskIndex, accessTime / 1000000.0);
+				}
 			}
 		}
 
@@ -153,15 +156,24 @@ public class RestfulMetricsRetriever {
 			for (int subTaskIndex = 0; subTaskIndex < tasks; subTaskIndex ++){
 				// Checkpoint Alignment Time
 				String metricsID = "checkpointAlignmentTime";
-				metrics.setAlignmentTime(operatorID, subTaskIndex, getSubTaskLongMetrics(operatorID, subTaskIndex, metricsID));
+				Long alignmentTime = getSubTaskLongMetrics(operatorID, subTaskIndex, metricsID);
+				if (alignmentTime != null) {
+					metrics.setAlignmentTime(operatorID, subTaskIndex, alignmentTime);
+				}
 
 				// 4. get queuing delay
 				metricsID = "queuingTime";
-				metrics.setQueuingDelay(operatorID, subTaskIndex, getSubTaskDoubleMetrics(operatorID, subTaskIndex, metricsID));
+				Double queuingTime = getSubTaskDoubleMetrics(operatorID, subTaskIndex, metricsID);
+				if(queuingTime != null) {
+					metrics.setQueuingDelay(operatorID, subTaskIndex, queuingTime);
+				}
 
 				// 5. get service time
 				metricsID = "serviceTime";
-				metrics.setServiceTime(operatorID, subTaskIndex, getSubTaskDoubleMetrics(operatorID, subTaskIndex, metricsID));
+				Double serviceTime = getSubTaskDoubleMetrics(operatorID, subTaskIndex, metricsID);
+				if (serviceTime != null) {
+					metrics.setServiceTime(operatorID, subTaskIndex, serviceTime);
+				}
 			}
 		}
 	}
@@ -189,8 +201,10 @@ public class RestfulMetricsRetriever {
 				// 1. get average state size
 				String metricsIDASS = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "stateSize";
 				Tuple2<Double, Long> tuple2 = getSubTaskDTuple2Metrics(operatorId, subTaskIndex, metricsIDASS);
-				metrics.setStateSizesCounter(operatorId, subTaskIndex, stateName, tuple2.f1);
-				metrics.setStateSizesState(operatorId, subTaskIndex, tuple2.f0);
+				if(tuple2 != null) {
+					metrics.setStateSizesCounter(operatorId, subTaskIndex, stateName, tuple2.f1);
+					metrics.setStateSizesState(operatorId, subTaskIndex, tuple2.f0);
+				}
 
 				// 2. get item frequency
 				String metricsIDIF = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "itemFrequency";
@@ -200,23 +214,33 @@ public class RestfulMetricsRetriever {
 				} catch (Exception e){
 					return false;
 				}
-				metrics.setItemFrequency(operatorId, subTaskIndex, stateName, itemFrequency);
+				if (itemFrequency != null) {
+					metrics.setItemFrequency(operatorId, subTaskIndex, stateName, itemFrequency);
+				}
 
 
 				// 6. get number of records in
 				String metricsID = "numRecordsIn";
-				metrics.setNumRecordsIn(operatorId, subTaskIndex, getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID));
+				Long numRecordsIn = getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID);
+				if (numRecordsIn != null) {
+					metrics.setNumRecordsIn(operatorId, subTaskIndex, numRecordsIn);
+				}
 
 				// 7. get arrival rate
 				metricsID = "numRecordsInPerSecond";
-				metrics.setArrivalRate(operatorId, subTaskIndex, getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID));
+				Double rate = getSubTaskDoubleMetrics(operatorId, subTaskIndex, metricsID);
+				if (rate != null) {
+					metrics.setArrivalRate(operatorId, subTaskIndex, rate);
+				}
 
 				metricsID = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "cacheDataHit";
 				Long hit = getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID);
 
 				metricsID = operatorName.replace(" ", "_") + ".state_name." + stateName + "." + "cacheDataMiss";
 				Long miss = getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID);
-				metrics.setCacheHitMiss(operatorId, subTaskIndex, hit, miss);
+				if(hit != null && miss != null) {
+					metrics.setCacheHitMiss(operatorId, subTaskIndex, hit, miss);
+				}
 			}
 		}
 		return true;
@@ -284,6 +308,9 @@ public class RestfulMetricsRetriever {
 	private Tuple2<Double, Long> getSubTaskDTuple2Metrics(String operatorId, int subTaskIndex, String metrics){
 		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
+		if (response == null)
+			return null;
+
 		Tuple2<Double, Long> tuple2 = new Tuple2<>();
 		for (JSONObject item : response) {
 			String itemStr = item.getString("value");
@@ -303,6 +330,9 @@ public class RestfulMetricsRetriever {
 		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 //		System.out.println("address: " + address);
 		List<JSONObject> response = getMetricsJsonArray(address);
+		if (response == null)
+			return null;
+
 		ArrayList<Long> list = new ArrayList<>();
 		for (JSONObject item : response){
 			String listStr = item.getString("value");
@@ -323,6 +353,9 @@ public class RestfulMetricsRetriever {
 	private Double getSubTaskDoubleMetrics(String operatorId, int subTaskIndex, String metrics){
 		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
+		if (response == null)
+			return null;
+
 		Double value = 0.0;
 		for(JSONObject item : response){
 			value = item.getDouble("value");
@@ -335,6 +368,9 @@ public class RestfulMetricsRetriever {
 	private Long getSubTaskLongMetrics(String operatorId, int subTaskIndex, String metrics){
 		String address = combineMetricsURL(operatorId, subTaskIndex, metrics);
 		List<JSONObject> response = getMetricsJsonArray(address);
+		if (response == null)
+			return null;
+
 		long value = 0L;
 		for(JSONObject item : response){
 			value = item.getLongValue("value");
