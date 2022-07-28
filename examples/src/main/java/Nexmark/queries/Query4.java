@@ -67,6 +67,7 @@ public class Query4 {
         final long keySize = params.getLong("keys", 10000);
         final double skewness = params.getDouble("skewness", 1.0);
         final boolean inputRateSpy = params.getBoolean("input-spy", false);
+        final int winSize = params.getInt("win-size", 1);
 //        int warmUp = 6*60*1000;
 
         int warmUp = 2*180*1000;
@@ -130,7 +131,7 @@ public class Query4 {
 //                        while (System.nanoTime() - start < 100_000) {}
                         return tuple.f0;
                     }
-                }).window(TumblingEventTimeWindows.of(Time.seconds(1)))
+                }).window(TumblingEventTimeWindows.of(Time.seconds(winSize)))
                 .trigger(new DummyTrigger())
                 .aggregate(new AvgAgg())
                 .name("Sliding Window")

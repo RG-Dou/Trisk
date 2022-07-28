@@ -40,7 +40,8 @@ public class DailyExpenditure {
 
         // set up the execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(100);
+        final int cpInterval = params.getInt("cp-interval", 100);
+        env.enableCheckpointing(cpInterval);
         env.getConfig().setAutoWatermarkInterval(1);
         env.disableOperatorChaining();
 
