@@ -205,8 +205,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 //			long processingDelay = System.nanoTime() - processingStart;
 			long processingDelay = record.getProcessTime();
 			processingDuration += processingDelay;
-//			long latency = queuingDelay + processingDelay/1000000;
-			long latency = System.currentTimeMillis() - record.getLatencyTimestamp();
+			long latency = queuingDelay + processingDelay/1000000;
+//			long latency = System.currentTimeMillis() - record.getLatencyTimestamp();
 			endToEndLatency += latency;
 			metricsManager.groundTruth(record.getLatencyTimestamp(), latency);
 //			if(metricsManager.getJobVertexId()!=null && metricsManager.getJobVertexId().contains("join") && recordsProcessed == 1)
