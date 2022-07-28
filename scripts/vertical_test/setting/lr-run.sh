@@ -20,7 +20,7 @@ init() {
   EXP_NAME="DailyExpenditure"
 
   FILE_PATH="${DATA_ROOT}/histData/hist_lite.out"
-  REQUEST_S=$3
+  REQUEST_S=$4
   STATE_SIZE=100000
   SKEWNESS=1
 
@@ -29,11 +29,11 @@ init() {
   FILTER_P=${PP}
 
   runtime=1200
-  totalCachePerTM=500
-  Controller=$1
-  Group=$2
-  Try=$4
-  CP_Interval=$5
+  totalCachePerTM=$1
+  Controller=$2
+  Group=$3
+  Try=$5
+  CP_Interval=$6
 
   SUB_DIR1=${CP_Interval}
   SUB_DIR2=${REQUEST_S}+$Controller+$Try
@@ -147,6 +147,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5
+init $1 $2 $3 $4 $5 $6
 run_one_exp
 #test

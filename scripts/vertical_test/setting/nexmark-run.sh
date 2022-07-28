@@ -11,7 +11,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 init() {
   # app level
-  DATA_ROOT="/home/drg/projects/work3/flink"
+  DATA_ROOT="/data/EMM_data"
   LATENCY_DIR="${DATA_ROOT}/data/trisk/"
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
@@ -33,7 +33,7 @@ init() {
 
   AUCTION_S=0
   PERSON_S=3000
-  BID_S=$4
+  BID_S=$5
   STATE_SIZE=100000
   KEY_SIZE=50000
   SKEWNESS=1
@@ -47,12 +47,12 @@ init() {
   FILTER_P=${PP}
 
   runtime=1200
-  totalCachePerTM=500
-  Controller=$2
-  Group=$3
-  Try=$5
-  CP_INTERVAL=$6
-  WIN_SIZE=$7
+  totalCachePerTM=$2
+  Controller=$3
+  Group=$4
+  Try=$6
+  CP_INTERVAL=$7
+  WIN_SIZE=$8
 
 
   if [[ "$1" = "q20" ]]; then
@@ -191,7 +191,7 @@ test() {
   mvRocksdbLog
 }
 
-# query(1) controller(2) group(3) source(4) try(5) interval(6) winSize(7)
-init $1 $2 $3 $4 $5 $6 $7
+# query(1) mem(2) controller(3) group(4) source(5) try(6) interval(7) winSize(8)
+init $1 $2 $3 $4 $5 $6 $7 $8
 run_one_exp
 #test
