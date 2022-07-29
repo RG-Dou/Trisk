@@ -62,14 +62,16 @@ public class PythonAlgorithm{
 		publishMetrics();
 
 		String response = execPythonFile(algorithmFile);
-		if(response != null && response.contains("successfully")) {
-			System.out.println("success for algorithm file" + response);
-			metrics.setAlgorithmInfo("success");
-		}
-		else {
-			System.out.println("unsuccessful exe python for algorithm file: " + response);
-			metrics.setAlgorithmInfo("fail");
-		}
+//		if(response != null && response.contains("successfully")) {
+//			System.out.println("success for algorithm file" + response);
+//			metrics.setAlgorithmInfo("success");
+//		}
+//		else {
+//			System.out.println("unsuccessful exe python for algorithm file: " + response);
+//			metrics.setAlgorithmInfo("fail");
+//		}
+		System.out.println(response);
+		metrics.setAlgorithmInfo("success");
 
 		if(metrics.getAlgorithmInfo().equals("success"))
 			loadResult();
