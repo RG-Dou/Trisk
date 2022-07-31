@@ -250,7 +250,7 @@ class LinearAlgorithm{
 			regression.addData(xRecords.f1 / xRecords.f0, yRecords.f1 / yRecords.f0);
 		}
 		if(xs.size() <= 1){
-			regression.addData(1.0, 0);
+			regression.addData(0.0, 0);
 		}
 	}
 
