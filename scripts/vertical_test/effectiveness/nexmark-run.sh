@@ -11,7 +11,7 @@ JAR=${FLINK_APP_DIR}$"target/testbed-1.0-SNAPSHOT.jar"
 
 init() {
   # app level
-  DATA_ROOT="/home/drg/projects/work3/flink"
+  DATA_ROOT="/data/EMM_data"
   LATENCY_DIR="${DATA_ROOT}/data/trisk/"
   ### paths configuration ###
   FLINK=$FLINK_DIR$"bin/flink"
@@ -36,7 +36,8 @@ init() {
   BID_S=$4
   STATE_SIZE=100000
   KEY_SIZE=50000
-  SKEWNESS=1
+#  SKEWNESS=1
+  SKEWNESS=$6
 
   PP=4
   AUCTION_P=${PP}
@@ -62,7 +63,7 @@ init() {
   ROCKSDB_CHECKPOINT=${ROCKSDB_DIR}"/checkpoint/"
   ROCKSDB_DATA="${ROCKSDB_DIR}/localdir/"
   rm -rf ${ROCKSDB_DATA}*
-  DATA_DIR="${DATA_ROOT}/data/${EXP_NAME}"
+  DATA_DIR="${DATA_ROOT}/data/perf/${EXP_NAME}"
 #  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/queue_delay"
 #  DATA_DIR="/home/drg/projects/work3/flink/data/${EXP_NAME}/state_size/${readCount}"
 #  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
@@ -83,12 +84,12 @@ function mvRocksdbLog() {
     if [[ ! -d ${DATA_DIR} ]]; then
             mkdir ${DATA_DIR}
     fi
-    mkdir ${DATA_DIR}/${BID_S}
-    if [[ -d ${DATA_DIR}/${BID_S}/${SUB_DIR} ]]; then
+    mkdir ${DATA_DIR}/${SKEWNESS}
+    if [[ -d ${DATA_DIR}/${SKEWNESS}/${SUB_DIR} ]]; then
             # shellcheck disable=SC2115
-            rm -rf ${DATA_DIR}/${BID_S}/${SUB_DIR}
+            rm -rf ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
     fi
-    mkdir ${DATA_DIR}/${BID_S}/${SUB_DIR}
+    mkdir ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
 #    mv ${ROCKSDB_LOG_DIR}* ${DATA_DIR}/${totalCachePerTM}/${simpleTest}
 #    for entry in ${ROCKSDB_LOG_DIR}*
 #    do
@@ -115,8 +116,8 @@ function cleanEnv() {
 #      rm -rf ${FLINK_DIR}${EXP_NAME}
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
-  mv ${FLINK_DIR}log/* ${DATA_DIR}/${BID_S}/${SUB_DIR}
-  mv ${LATENCY_DIR}* ${DATA_DIR}/${BID_S}/${SUB_DIR}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
