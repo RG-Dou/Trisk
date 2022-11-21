@@ -195,6 +195,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5
+init $1 $2 $3 $4 $5 $6
 run_one_exp
 #test
