@@ -59,12 +59,12 @@ function mvRocksdbLog() {
     if [[ ! -d ${DATA_DIR} ]]; then
             mkdir ${DATA_DIR}
     fi
-    mkdir ${DATA_DIR}/${REQUEST_S}
-    if [[ -d ${DATA_DIR}/${REQUEST_S}/${SUB_DIR} ]]; then
+    mkdir ${DATA_DIR}/${SKEWNESS}
+    if [[ -d ${DATA_DIR}/${SKEWNESS}/${SUB_DIR} ]]; then
             # shellcheck disable=SC2115
-            rm -rf ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+            rm -rf ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
     fi
-    mkdir ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+    mkdir ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
     echo "INFO: move rocksdb Log"
 
 }
@@ -86,8 +86,8 @@ function cleanEnv() {
 #      rm -rf ${FLINK_DIR}${EXP_NAME}
 #  fi
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
-  mv ${FLINK_DIR}log/* ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
-  mv ${LATENCY_DIR}* ${DATA_DIR}/${REQUEST_S}/${SUB_DIR}
+  mv ${FLINK_DIR}log/* ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
+  mv ${LATENCY_DIR}* ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
