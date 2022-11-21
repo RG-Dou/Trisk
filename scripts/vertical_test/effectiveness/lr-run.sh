@@ -22,7 +22,7 @@ init() {
   FILE_PATH="${DATA_ROOT}/histData/hist_lite.out"
   REQUEST_S=$3
   STATE_SIZE=100000
-  SKEWNESS=1
+  SKEWNESS=$6
 
   PP=4
   STATE_P=${PP}
@@ -144,6 +144,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4
+init $1 $2 $3 $4 $5 $6
 run_one_exp
 #test

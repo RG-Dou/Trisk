@@ -61,7 +61,8 @@ public class DailyExpenditure {
         }
 
         long keys = 10;
-        RequestSourceFuntion requestSrc = new RequestSourceFuntion(requestRate, keys);
+//        RequestSourceFuntion requestSrc = new RequestSourceFuntion(requestRate, keys);
+        RequestSourceFuntion requestSrc = new RequestSourceFuntion(requestRate, keys, skewness);
         requestSrc.setFilePath(histFilePath);
         if (inputRateSpy) requestSrc.enableInputRateSpy();
 
