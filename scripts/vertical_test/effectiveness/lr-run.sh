@@ -40,7 +40,7 @@ init() {
   ROCKSDB_CHECKPOINT=${ROCKSDB_DIR}"/checkpoint/"
   ROCKSDB_DATA="${ROCKSDB_DIR}/localdir/"
   rm -rf ${ROCKSDB_DATA}*
-  DATA_DIR="${DATA_ROOT}/data/${EXP_NAME}"
+  DATA_DIR="${DATA_ROOT}/data/perf/${EXP_NAME}"
 #  sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'
 #  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 }
