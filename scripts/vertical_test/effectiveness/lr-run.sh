@@ -22,7 +22,7 @@ init() {
   FILE_PATH="${DATA_ROOT}/histData/hist_lite.out"
   REQUEST_S=$3
   STATE_SIZE=100000
-  SKEWNESS=$6
+  SKEWNESS=$5
 
   PP=4
   STATE_P=${PP}
@@ -88,7 +88,7 @@ function cleanEnv() {
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
   mv ${FLINK_DIR}log/* ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
   mv ${LATENCY_DIR}* ${DATA_DIR}/${SKEWNESS}/${SUB_DIR}
-  rm -rf /tmp/flink*
+#  rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
 
@@ -144,6 +144,6 @@ test() {
   mvRocksdbLog
 }
 
-init $1 $2 $3 $4 $5 $6
+init $1 $2 $3 $4 $5
 run_one_exp
 #test
