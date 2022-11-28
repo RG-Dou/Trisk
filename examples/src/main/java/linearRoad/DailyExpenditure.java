@@ -93,7 +93,7 @@ public class DailyExpenditure {
                 .filter(new FilterFunction<Tuple5<Integer, Long, Long, Integer, Integer>>() {
                     @Override
                     public boolean filter(Tuple5<Integer, Long, Long, Integer, Integer> joinTuple) throws Exception {
-                        return (joinTuple.f2 - joinTuple.f1 < 10_000);
+                        return (joinTuple.f2 - joinTuple.f1 < 10_000_000);
                     }
                 }).setParallelism(params.getInt("p-filter", 1)).slotSharingGroup(groupFilter);
 
