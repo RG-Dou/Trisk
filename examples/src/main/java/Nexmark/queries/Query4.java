@@ -81,7 +81,8 @@ public class Query4 {
         AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, keySize, 0, warmUp);
         auctionSrc.setSkewField("Warmup");
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keySize, skewness, warmUp);
-        bidSrc.setSkewField("Auction");
+//        bidSrc.setSkewField("Auction");
+        bidSrc.setSkewField("Random");
         if (inputRateSpy) bidSrc.enableInputRateSpy();
 
         DataStream<Auction> auctions = env.addSource(auctionSrc)

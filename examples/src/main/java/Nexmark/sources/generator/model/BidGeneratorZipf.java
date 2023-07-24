@@ -75,9 +75,9 @@ public class BidGeneratorZipf implements Serializable {
 //        auction = num1 + dataGen.nextZipf(100, 0.6);
         auction = nextLong(random, keys);
 //        System.out.println("bid: " + auction);
-        if(dataGen.nextInt(0, 2) == 1){
-            auction = 100;
-        }
+//        if(dataGen.nextInt(0, 2) == 1){
+//            auction = 100;
+//        }
 //        auction = nextLong(random, 10000);
 
         long bidder;
