@@ -9,7 +9,7 @@ import numpy as np
 import logging as log
 from math import sqrt
 
-root = os.path.split(os.path.realpath(__file__))[0]+"/temp"
+root = os.path.split(os.path.realpath(__file__))[0]+"/data"
 # root = os.path.split(os.path.realpath(__file__))[0]
 log.basicConfig(level=logging.INFO, filename=root+"/algorithm.log")
 
