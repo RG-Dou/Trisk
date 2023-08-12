@@ -150,7 +150,7 @@ public class RestfulMetricsRetriever {
 		}
 
 		// all operators metrics
-		for(String operatorID: metrics.getOperatorFullList()){
+		for(String operatorID: metrics.getOperatorList()){
 			OperatorMetrics operator = metrics.getOperator(operatorID);
 			int tasks = operator.getNumTasks();
 			for (int subTaskIndex = 0; subTaskIndex < tasks; subTaskIndex ++){

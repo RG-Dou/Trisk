@@ -93,7 +93,8 @@ public class TaskMetrics {
 	}
 
 	public void updateFrontEndTime(double k){
-		frontEndTime.f0 += serviceTime - stateMetric.getAccessTime() * k;
+//		frontEndTime.f0 += serviceTime - stateMetric.getAccessTime() * k;
+		frontEndTime.f0 += serviceTime - stateMetric.getAccessTime();
 		frontEndTime.f1 += 1;
 	}
 
