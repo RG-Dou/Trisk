@@ -343,11 +343,10 @@ def load_basic_info():
     parameters.append(parse_operator_int(config.get("info", "task.num")))
     parameters.append(parse_task_int(config.get("info", "task.instance")))
     parameters.append(config.getint("info", "memory.size"))
-    global ratio
+    global N, task_num, task_instances, M, ratio
     ratio = parameters[3] * 1.0 / BASE_M
 
 
-    global N, task_num, task_instances, M, ratio
     N = parameters[0]
     task_num = parameters[1]
     task_instances = parameters[2]
