@@ -15,6 +15,9 @@ public class StateMetrics {
 	private double hitRatio;
 	private double stateTimeInstant;
 
+	public ArrayList<Long> cacheSizeHist = new ArrayList<>();
+	public ArrayList<Double> missRatioHist = new ArrayList<>();
+
 	// f0. watermark -- the start counter of this time scheduling
 	// f1. collection times
 	// f2. the total access time of this time scheduling
@@ -86,6 +89,10 @@ public class StateMetrics {
 		this.hitRatio = hitRatio;
 	}
 
+	public void appendHist(long cacheSize){
+		missRatioHist.add(1.0 - hitRatio);
+		cacheSizeHist.add(cacheSize);
+	}
 
 	public String itemFrequencyToString(){
 		StringBuilder builder = new StringBuilder();
@@ -93,6 +100,14 @@ public class StateMetrics {
 			builder.append(item).append("-");
 		}
 		builder.deleteCharAt(builder.lastIndexOf("-"));
+		return builder.toString();
+	}
+
+	public String cacheMissHistToString(){
+		StringBuilder builder = new StringBuilder();
+		for (int index = 0; index < cacheSizeHist.size(); index ++){
+			builder.append(cacheSizeHist.get(index)).append(" ").append(missRatioHist.get(index)).append("\n");
+		}
 		return builder.toString();
 	}
 

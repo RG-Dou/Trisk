@@ -199,6 +199,11 @@ public class OperatorMetrics {
 		return builder.toString();
 	}
 
+	public String cacheMissHistToString(int taskID){
+		return taskMetricsList.get(taskID).cacheMissHistToString();
+	}
+
+
 	public String toSting(){
 		String str = "operator: " + operatorName + ", id: " + id +
 			", numTask: " + getNumTasks() +

@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.controlplane.udm.vscaling;
+package org.apache.flink.streaming.controlplane.udm.vscaling.algorithm;
 
 import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.OperatorMetrics;
 import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.SlotMetrics;
@@ -11,31 +11,31 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-public class PythonAlgorithm{
+public class CacheMissEqnAlgorithm implements Algorithm{
 
 	private final VScalingMetrics metrics;
 	private final String algorithmFile;
-	private final String cheApproxExcFile;
+	private final String fittingFile;
 	private final String basicInfoFile;
+	private final String dataPath;
+	private final String dataFile;
 	private final String metricsFile;
 	private final String resultFile;
-	private final String cheApproxInputFile;
-	private final String cheApproxOutputFile;
 
-	private final String TEMP_DIRECT = "/temp";
+	private final String DATA_DIRECT = "/data";
 
-	public PythonAlgorithm(VScalingMetrics metrics, String path){
+	public CacheMissEqnAlgorithm(VScalingMetrics metrics, String path){
 		this.metrics = metrics;
-//		algorithmFile = this.getClass().getResource("/algorithm.py").getFile();
 
 		algorithmFile = path + "/algorithm.py";
-		cheApproxExcFile = path + "/cheApprox.py";
-		recreatePath(path, TEMP_DIRECT);
-		basicInfoFile = path + TEMP_DIRECT + "/basic_info.properties";
-		metricsFile = path + TEMP_DIRECT + "/metrics.data";
-		resultFile = path + TEMP_DIRECT + "/result.data";
-		cheApproxInputFile = path + TEMP_DIRECT + "/cheApprox-input.data";
-		cheApproxOutputFile = path + TEMP_DIRECT + "/cheApprox-output.data";
+		fittingFile = path + "/fit";
+		dataPath = path + DATA_DIRECT;
+		recreatePath(path, DATA_DIRECT);
+
+		basicInfoFile = dataPath + "/basic_info.properties";
+		dataFile = dataPath + "/points";
+		metricsFile = dataPath + "/metrics.data";
+		resultFile = dataPath + "/result.data";
 	}
 
 	public void recreatePath(String path, String directoryName){
@@ -51,54 +51,36 @@ public class PythonAlgorithm{
 		absPath.mkdir();
 	}
 
+	@Override
 	public void init(){
 		publishBasicInfo();
 	}
 
+	private void publishBasicInfo(){
+		String stringBuilder = "[info]\n" +
+			"operator.num=" + metrics.getNumOperator() + "\n" +
+			"task.num=" + metrics.numTasksToString() + "\n" +
+			"task.instance=" + metrics.taskInstancesToString() + "\n" +
+			"memory.size=" + metrics.getTotalMem() + "\n";
+		writeFile(basicInfoFile, stringBuilder);
+	}
+
+	@Override
 	public void startExec(){
 		if(!checkInputData())
 			return;
 
+		// step1: fitting for CacheMissEqn
+		startCacheMissEqn();
+
 		publishMetrics();
 
 		String response = execPythonFile(algorithmFile);
-//		if(response != null && response.contains("successfully")) {
-//			System.out.println("success for algorithm file" + response);
-//			metrics.setAlgorithmInfo("success");
-//		}
-//		else {
-//			System.out.println("unsuccessful exe python for algorithm file: " + response);
-//			metrics.setAlgorithmInfo("fail");
-//		}
 		System.out.println(response);
 		metrics.setAlgorithmInfo("success");
 
 		if(metrics.getAlgorithmInfo().equals("success"))
 			loadResult();
-	}
-
-	// After get all hit ratio of all state, then we can update K and B.
-	public void excCheApprox(){
-		// write input data
-		String stringBuilder = "[data]\n" +
-			"epoch=" + metrics.getEpoch() + "\n" +
-			"cache.size=" + metrics.oldMemToString() + "\n" +
-			"state.size=" + metrics.stateSizesTaskToString() + "\n" +
-			"item.frequency=" + metrics.itemFrequencyToString() + "\n";
-		writeFile(cheApproxInputFile, stringBuilder);
-
-		// execute python file
-		String response = execPythonFile(cheApproxExcFile);
-		if(response != null && response.contains("successfully")) {
-//			System.out.println("success for che approximation file" + response);
-			metrics.setCheApproxInfo("success");
-		}
-		else {
-//			System.out.println("unsuccessful exe python for Che approximation file: " + response);
-			metrics.setCheApproxInfo("fail");
-		}
-
-		loadCheApproxOutput();
 	}
 
 	public boolean checkInputData(){
@@ -133,13 +115,33 @@ public class PythonAlgorithm{
 		return true;
 	}
 
-	private void publishBasicInfo(){
-		String stringBuilder = "[info]\n" +
-			"operator.num=" + metrics.getNumOperator() + "\n" +
-			"task.num=" + metrics.numTasksToString() + "\n" +
-			"task.instance=" + metrics.taskInstancesToString() + "\n" +
-			"memory.size=" + metrics.getTotalMem() + "\n";
-		writeFile(basicInfoFile, stringBuilder);
+	private void startCacheMissEqn(){
+		int index = 0;
+		for (String operatorID : metrics.getOperatorList()){
+			for (int taskID = 0; taskID < metrics.getOperator(operatorID).getNumTasks(); taskID ++){
+				String data = metrics.cacheMissHistToString(operatorID, taskID);
+				String fileNameIn = dataFile + "-" + index + "-" + taskID;
+				// publish data
+				writeFile(fileNameIn, data);
+
+				// exe c script
+				execScript(fileNameIn);
+
+				String fileNameOut = fileNameIn + ".g";
+
+				printCacheMissEqnLog(fileNameOut);
+			}
+			index ++;
+		}
+	}
+
+	private void printCacheMissEqnLog(String fileName){
+		String outs = readFile(fileName);
+		for(String line : outs.split("\n")){
+			if (line.contains("set title")){
+				System.out.println("CacheMissEqn: " + line.split("\"")[1]);
+			}
+		}
 	}
 
 	private void publishMetrics(){
@@ -150,10 +152,19 @@ public class PythonAlgorithm{
 			"backlog=" + metrics.backlogToString() + "\n" +
 			"arrivalRate=" + metrics.arrivalRateToString() + "\n" +
 			"alpha=" + metrics.alphaToString() + "\n" +
-			"beta=" + metrics.betaToString() + "\n" +
-			"state.size=" + metrics.stateSizesTaskToString() + "\n" +
-			"item.frequency=" + metrics.itemFrequencyToString() + "\n";
+			"beta=" + metrics.betaToString() + "\n";
 		writeFile(metricsFile, stringBuilder);
+	}
+
+	private void execScript(String fileName){
+
+		try {
+			String command = fittingFile + " " + fileName;
+			Process process = Runtime.getRuntime().exec(command);
+			process.waitFor(); // 等待脚本执行完成
+		} catch (IOException | InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private String execPythonFile(String file){
@@ -194,34 +205,6 @@ public class PythonAlgorithm{
 			OperatorMetrics operator = metrics.getOperator(operators.get(operatorIndex));
 			operator.getTaskMetrics(taskIndex).setOptimalAllocation(Double.parseDouble(item));
 			if (taskIndex >= operator.getNumTasks() - 1){
-				operatorIndex += 1;
-				taskIndex = 0;
-			} else {
-				taskIndex += 1;
-			}
-		}
-	}
-
-	private void loadCheApproxOutput(){
-		// Load data
-		String[] result = readFile(cheApproxOutputFile).split("\n");
-		long algorithmEpoch = Long.parseLong(result[0].split("=")[1]);
-		if(algorithmEpoch != metrics.getEpoch()){
-			System.out.println("Wrong Epoch for Che approximation");
-			metrics.setCheApproxInfo("false");
-			return;
-		}
-		String hitRatios = result[1].split("=")[1];
-
-		int operatorIndex = 0;
-		int taskIndex = 0;
-		ArrayList<String> operators = metrics.getOperatorList();
-		for(String item : hitRatios.substring(1, hitRatios.length() - 1).split(", ")){
-			OperatorMetrics operator = metrics.getOperator(operators.get(operatorIndex));
-			operator.getTaskMetrics(taskIndex).getStateMetric().setHitRatio(Double.parseDouble(item));
-
-			// Hop one operator index
-			if (taskIndex >= operator.getNumTasks()){
 				operatorIndex += 1;
 				taskIndex = 0;
 			} else {

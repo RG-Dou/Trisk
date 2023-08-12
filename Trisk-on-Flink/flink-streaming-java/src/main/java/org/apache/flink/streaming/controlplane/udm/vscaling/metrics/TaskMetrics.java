@@ -147,6 +147,10 @@ public class TaskMetrics {
 		return stateMetric.itemFrequencyToString();
 	}
 
+	public String cacheMissHistToString(){
+		return stateMetric.cacheMissHistToString();
+	}
+
 	public String getSlotID() {
 		return slotID;
 	}

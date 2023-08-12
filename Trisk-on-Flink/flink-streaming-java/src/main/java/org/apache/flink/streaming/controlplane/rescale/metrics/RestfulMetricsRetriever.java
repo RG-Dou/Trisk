@@ -240,6 +240,11 @@ public class RestfulMetricsRetriever {
 				Long miss = getSubTaskLongMetrics(operatorId, subTaskIndex, metricsID);
 				if(hit != null && miss != null) {
 					metrics.setCacheHitMiss(operatorId, subTaskIndex, hit, miss);
+
+					//append history data
+					String slotID = metrics.getOperator(operatorId).getTaskMetrics(subTaskIndex).getSlotID();
+					long cacheSize = metrics.getSlot(slotID).getOldMemSize();
+					metrics.setStateHist(operatorId, subTaskIndex, cacheSize);
 				}
 			}
 		}

@@ -5,6 +5,7 @@ import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
+import org.apache.flink.streaming.controlplane.udm.vscaling.algorithm.*;
 import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,10 +16,11 @@ import java.util.*;
 public class ElasticMemoryManager extends AbstractMemoryManager {
 	private static final Logger LOG = LoggerFactory.getLogger(ElasticMemoryManager.class);
 	private final TestingThread testingThread;
-	private final PythonAlgorithm algorithm;
+	private final Algorithm algorithm;
 
 	private final String SCHEDULE_INTERVAL = "trisk.config.schedule_interval";
-	private final String AlgorithmDataPath = "trisk.vScaling.python.path";
+	private final String AlgorithmPath = "trisk.vScaling.python.path";
+	private final String AlgorithmType = "trisk.vScaling.python.type";
 	private final Long scheduleInterval;
 	private boolean onScheduling = false;
 	private long scheduleTime;
@@ -27,8 +29,12 @@ public class ElasticMemoryManager extends AbstractMemoryManager {
 		super(reconfigurationExecutor, configuration);
 		scheduleInterval = configuration.getLong(SCHEDULE_INTERVAL, 20000);
 		// ToDo: the python path should be a relative path: "Trisk-on-Flink/flink-tools/"
-		String algorithmPath = configuration.getString(AlgorithmDataPath, "/home/drg/projects/work3/flink/alg-data/");
-		algorithm = new PythonAlgorithm(metrics, algorithmPath);
+		String algorithmType = configuration.getString(AlgorithmType, "CacheMissEqn");
+		String algorithmPath = configuration.getString(AlgorithmPath, "/home/drg/projects/work3/flink/alg-data/");
+		if (algorithmType.equals("Che"))
+			algorithm = new PythonAlgorithm(metrics, algorithmPath);
+		else
+			algorithm = new CacheMissEqnAlgorithm(metrics, algorithmPath);
 		testingThread = new TestingThread();
 	}
 

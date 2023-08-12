@@ -89,6 +89,10 @@ public class VScalingMetrics {
 		return result.toString();
 	}
 
+	public String cacheMissHistToString(String operatorID,int taskID){
+		return operatorMap.get(operatorID).cacheMissHistToString(taskID);
+	}
+
 	public void setStateName(String operatorId, String stateName){
 		if(!operatorMap.containsKey(operatorId)){
 			OperatorMetrics operator = operatorFullMap.get(operatorId);
@@ -261,6 +265,10 @@ public class VScalingMetrics {
 
 	public void setItemFrequency(String operatorId, int taskIndex, String stateName, ArrayList<Long> frequency){
 		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().setItemFrequency(frequency);
+	}
+
+	public void setStateHist(String operatorId, int taskIndex, long cacheSize){
+		operatorMap.get(operatorId).getTaskMetrics(taskIndex).getStateMetric().appendHist(cacheSize);
 	}
 
 	public String itemFrequencyToString(){
