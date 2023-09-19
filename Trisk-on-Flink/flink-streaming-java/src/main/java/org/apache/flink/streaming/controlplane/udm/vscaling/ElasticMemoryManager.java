@@ -34,7 +34,7 @@ public class ElasticMemoryManager extends AbstractMemoryManager {
 		if (algorithmType.equals("Che"))
 			algorithm = new PythonAlgorithm(metrics, algorithmPath);
 		else
-			algorithm = new CacheMissEqnAlgorithm(metrics, algorithmPath);
+			algorithm = new CacheMissEqnSimple(metrics, algorithmPath);
 		testingThread = new TestingThread();
 	}
 

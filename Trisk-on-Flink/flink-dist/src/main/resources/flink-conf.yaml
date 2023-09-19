@@ -258,6 +258,7 @@ jobmanager.execution.failover-strategy: region
 #==============================================================================
 
 trisk.controller: ElasticMemoryManager
+trisk.vScaling.python.type: CacheMissEqn
 
 policy.windowSize: 5000000000
 

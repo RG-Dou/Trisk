@@ -53,6 +53,7 @@ init() {
   Group=$3
   Try=$5
   Cache_Policy=$8
+  Algorithm=${10}
   SUB_DIR=$totalCachePerTM+$Try
 
   ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
@@ -68,6 +69,7 @@ function configApp() {
     echo "INFO: config app block cache size: ${totalCachePerTM}m"
     sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
     sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
+    sed -i "s/^\(trisk.vScaling.python.type: \)\(CacheMissEqn\|Che\)/\1${Algorithm}/"  ${FLINK_DIR}conf/flink-conf.yaml
 }
 
 function mvRocksdbLog() {
@@ -180,6 +182,6 @@ test() {
   mvRocksdbLog
 }
 
-init q4 BlankController false 2000 $1 1.0 $2 $3 Random
+init $1 $2 $3 $4 $5 $6 $7 $8 $9
 run_one_exp
 #test
