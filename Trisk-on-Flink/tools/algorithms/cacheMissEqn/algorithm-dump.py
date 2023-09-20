@@ -8,7 +8,6 @@ import configparser
 import numpy as np
 import logging as log
 from math import sqrt
-import copy
 
 root = os.path.split(os.path.realpath(__file__))[0]+"/data"
 # root = os.path.split(os.path.realpath(__file__))[0]
@@ -35,6 +34,8 @@ Minimize The Maximum Latency
 """
 
 global N, task_num, task_instances, M
+global ratio
+BASE_M = 1024
 
 
 # cache miss equation
@@ -84,7 +85,7 @@ def object_function(t, k, backlog, alpha, beta, parameters):
             Ni = task_num[i]
             latencies = []
             for j in range(0, Ni):
-                miss_ratio = cache_miss_eqn(x[x_index], parameters[i][j])
+                miss_ratio = cache_miss_eqn(x[x_index] * ratio, parameters[i][j])
                 x_index += 1
 
                 state_access = miss_ratio * alpha[i] + beta[i]
@@ -95,7 +96,10 @@ def object_function(t, k, backlog, alpha, beta, parameters):
         # print(x)
         # print("ene to end latency: " + str(sum))
         return sum
-    return fun
+
+    fx = lambda x : fun(x)
+    return fx
+
 
 def constraint():
     num_TM = np.max(task_instances) + 1
@@ -232,34 +236,34 @@ def print_result(m, t, k, backlog, alpha, beta, parameters_cacheMissEqn, end_to_
     log.info(parameter_info)
 
 
-# def init_x0(length, value):
-#     array = []
-#     for i in range(length):
-#         array.append(int(value / length))
-#     return array
+def init_x0(length, value):
+    array = []
+    for i in range(length):
+        array.append(int(value / length))
+    return array
 
 
-def init_x0(backlog, total_memory):
-    array, total_size, operator_sizes, task_sizes = [], 0, [], []
-    for i in range(0, N):
-        operator_size = 0
-        for j in range(0, task_num[i]):
-            size = 1
-            operator_size += size
-            total_size += size
-            task_sizes.append(int(size))
-        operator_sizes.append(operator_size)
-
-    for i in range(0, N):
-        operator_sizes[i] = operator_sizes[i] * 1.0/ total_size * total_memory
-    for i in range(0, N):
-        operator_memory = operator_sizes[i]
-        total_backlog = 0
-        for j in range(0, task_num[i]):
-            total_backlog += backlog[i][j]
-        for j in range(0, task_num[i]):
-            array.append(int(backlog[i][j] * 1.0 / total_backlog * operator_memory))
-    return array, task_sizes
+# def init_x0(state_sizes, total_item, backlog, total_memory):
+#     array, total_size, operator_sizes, task_sizes = [], 0, [], []
+#     for i in range(0, N):
+#         operator_size = 0
+#         for j in range(0, task_num[i]):
+#             size = total_item[i][j] * state_sizes[i]
+#             operator_size += size
+#             total_size += size
+#             task_sizes.append(int(size))
+#         operator_sizes.append(operator_size)
+#
+#     for i in range(0, N):
+#         operator_sizes[i] = operator_sizes[i] * 1.0/ total_size * total_memory
+#     for i in range(0, N):
+#         operator_memory = operator_sizes[i]
+#         total_backlog = 0
+#         for j in range(0, task_num[i]):
+#             total_backlog += backlog[i][j]
+#         for j in range(0, task_num[i]):
+#             array.append(int(backlog[i][j] * 1.0 / total_backlog * operator_memory))
+#     return array, task_sizes
 
 
 def min_max_latency_main(t, k, backlog, alpha, beta, parameters_cacheMissEqn):
@@ -267,8 +271,8 @@ def min_max_latency_main(t, k, backlog, alpha, beta, parameters_cacheMissEqn):
     fun = object_function(t, k, backlog, alpha, beta, parameters_cacheMissEqn)
     con = constraint()
 
-    # x0_array = init_x0(np.sum(task_num), M)
-    x0_array, task_sizes = init_x0(backlog, M)
+    x0_array = init_x0(np.sum(task_num), M)
+    # x0_array, task_sizes = init_x0(state_sizes, total_item, backlog, M)
     x0 = np.array(x0_array)
 
     b, bnds = (0, M), []
@@ -277,55 +281,19 @@ def min_max_latency_main(t, k, backlog, alpha, beta, parameters_cacheMissEqn):
         # bnds.append(tuple(c))
         bnds.append(b)
 
+    res2 = minimize(fun, x0, method='SLSQP', bounds=tuple(bnds), constraints=con)
 
-    # res2 = minimize(fun, x0, method='SLSQP', bounds=tuple(bnds), constraints=con)
-    optimal_size, min_latency = minimize_gradient_descent(fun, x0_array, 5)
+    log.info("Optimization problem :\t{}".format(res2.message))  #
+    print("Optimization problem :\t{}".format(res2.message))  #
 
 
-    # log.info("Optimization problem :\t{}".format(res2.message))  #
-    # print("Optimization problem :\t{}".format(res2.message))  #
-    #
-    #
-    results = [i for i in optimal_size]
-    #
-    print_result(results, t, k, backlog, alpha, beta, parameters_cacheMissEqn, min_latency)
+    results = [i*ratio for i in res2.x]
+
+    print_result(results, t, k, backlog, alpha, beta, parameters_cacheMissEqn, res2.fun)
     return results
     # print("xOpt = {}".format(res2.x))  #
     # print("min f(x) = {:.4f}".format(res2.fun))  #
 
-
-def comp(f, xs, i, j, step):
-    xs_tmp = copy.deepcopy(xs)
-    xs_tmp[i] += step
-    xs_tmp[j] -= step
-    if xs_tmp[i] < 0 or xs_tmp[j] < 0:
-        return False
-    l_tmp = f(xs_tmp)
-    l = f(xs)
-    return l_tmp < l
-
-
-def minimize_gradient_descent(f, xs, step):
-    size = len(xs)
-    for i in range(size):
-        for j in range(i+1, size):
-            step_tmp = 0
-            if comp(f, xs, i, j, step):
-                step_tmp = step
-            if comp(f, xs, i, j, -step):
-                step_tmp = -step
-
-            if step_tmp != 0:
-                count = 1
-                while comp(f, xs, i, j, step_tmp * count):
-                    count += 1
-                count -= 1
-                xs[i] += count * step_tmp
-                xs[j] -= count * step_tmp
-                i = 0
-    print(xs)
-    print(f(xs))
-    return xs, f(xs)
 
 # load messages and write results.
 """
@@ -376,12 +344,14 @@ def load_basic_info():
     parameters.append(parse_task_int(config.get("info", "task.instance")))
     parameters.append(config.getint("info", "memory.size"))
     global N, task_num, task_instances, M, ratio
+    ratio = parameters[3] * 1.0 / BASE_M
 
 
     N = parameters[0]
     task_num = parameters[1]
     task_instances = parameters[2]
     M = int(parameters[3])
+    M = BASE_M
 
     print_basic_info()
 
