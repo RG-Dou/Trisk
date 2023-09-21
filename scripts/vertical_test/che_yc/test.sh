@@ -1,7 +1,7 @@
 # by default
 
 start() {
-  bash nexmark-run.sh q20 ElasticMemoryManager true 2000 $1 1.0 $2 $3 Random $4
+  bash nexmark-run.sh q20 ElasticMemoryManager true 1000 $1 1.0 $2 $3 $4
 }
 
 caches="500"

@@ -32,12 +32,11 @@ init() {
   EXP_NAME="nexmark-$1"
 
   AUCTION_S=0
-  PERSON_S=3000
+  PERSON_S=100
   BID_S=$4
   STATE_SIZE=100000
   KEY_SIZE=50000
   SKEWNESS=$6
-  SKEW_POLICY=$9
 
   PP=1
   AUCTION_P=${PP}
@@ -53,7 +52,7 @@ init() {
   Group=$3
   Try=$5
   Cache_Policy=$8
-  Algorithm=${10}
+  Algorithm=$9
   SUB_DIR=$totalCachePerTM+$Try
 
   ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
@@ -133,9 +132,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -skew-policy ${SKEW_POLICY} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -skew-policy ${SKEW_POLICY} &
+  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &
 }
 
 function runGenerator() {
