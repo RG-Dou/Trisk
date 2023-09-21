@@ -38,7 +38,7 @@ init() {
   KEY_SIZE=50000
   SKEWNESS=$6
 
-  PP=1
+  PP=4
   AUCTION_P=${PP}
   PERSON_P=${PP}
   BID_P=${PP}
@@ -46,7 +46,7 @@ init() {
   WIN_P=${PP}
   FILTER_P=${PP}
 
-  runtime=1200
+  runtime=1500
   totalCachePerTM=$7
   Controller=$2
   Group=$3
