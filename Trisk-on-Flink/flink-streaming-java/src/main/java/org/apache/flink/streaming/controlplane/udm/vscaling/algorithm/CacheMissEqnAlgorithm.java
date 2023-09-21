@@ -15,19 +15,23 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 
 	private final VScalingMetrics metrics;
 	private final String algorithmFile;
+	private final String cheFile;
 	private final String fittingFile;
 	private final String basicInfoFile;
 	private final String dataPath;
 	private final String dataFile;
 	private final String metricsFile;
+	private final String cheDataFile;
 	private final String resultFile;
-
 	private final String DATA_DIRECT = "/data";
+
+	private Map<Integer, Map<Integer, Map<Double, Long>>> estimatedPoints = new HashMap<>();
 
 	public CacheMissEqnAlgorithm(VScalingMetrics metrics, String path){
 		this.metrics = metrics;
 
 		algorithmFile = path + "/algorithm.py";
+		cheFile = path + "/che.py";
 		fittingFile = path + "/fit";
 		dataPath = path + DATA_DIRECT;
 		recreatePath(path, DATA_DIRECT);
@@ -35,6 +39,7 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 		basicInfoFile = dataPath + "/basic_info.properties";
 		dataFile = dataPath + "/points";
 		metricsFile = dataPath + "/metrics.data";
+		cheDataFile = dataFile + "/points-from-che.data";
 		resultFile = dataPath + "/result.data";
 	}
 
@@ -53,7 +58,18 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 
 	@Override
 	public void init(){
+//		need to compile the c file first.
+		compileFit();
+
 		publishBasicInfo();
+	}
+
+	private void compileFit(){
+		String[] cmd = new String[] {"gcc", fittingFile+".c", "-o", fittingFile, "-lm"};
+		String msg = execScript(cmd);
+		if (msg.contains("error")){
+			System.out.println("Compile fit.c failed, msg: " + msg);
+		}
 	}
 
 	private void publishBasicInfo(){
@@ -70,10 +86,15 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 		if(!checkInputData())
 			return;
 
-		// step1: fitting for CacheMissEqn
-		startCacheMissEqn();
-
+		// Step1: publish metrics
 		publishMetrics();
+
+		// Step2: get estimated points based on Che's approximation
+		estimatedFromChe();
+
+
+		// step2: fitting for CacheMissEqn
+		startCacheMissEqn();
 
 		String response = execPythonFile(algorithmFile);
 		System.out.println(response);
@@ -120,12 +141,13 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 		for (String operatorID : metrics.getOperatorList()){
 			for (int taskID = 0; taskID < metrics.getOperator(operatorID).getNumTasks(); taskID ++){
 				String data = metrics.cacheMissHistToString(operatorID, taskID);
+//				data = appendEstimatedFromChe(index, taskID, data);
 				String fileNameIn = dataFile + "-" + index + "-" + taskID;
 				// publish data
 				writeFile(fileNameIn, data);
 
 				// exe c script
-				execScript(fileNameIn);
+				execFit(fileNameIn);
 
 				String fileNameOut = fileNameIn + ".g";
 
@@ -134,6 +156,10 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 			index ++;
 		}
 	}
+
+//	private String appendEstimatedFromChe(int operator, int task, String data){
+//
+//	}
 
 	private void printCacheMissEqnLog(String fileName){
 		String outs = readFile(fileName);
@@ -152,29 +178,57 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 			"backlog=" + metrics.backlogToString() + "\n" +
 			"arrivalRate=" + metrics.arrivalRateToString() + "\n" +
 			"alpha=" + metrics.alphaToString() + "\n" +
-			"beta=" + metrics.betaToString() + "\n";
+			"beta=" + metrics.betaToString() + "\n" +
+			"state.size=" + metrics.stateSizesTaskToString() + "\n" +
+			"item.frequency=" + metrics.itemFrequencyToString() + "\n";
 		writeFile(metricsFile, stringBuilder);
 	}
 
-	private void execScript(String fileName){
+	private void estimatedFromChe(){
+		String[] cmdArr = new String[] {"python3", cheFile};
+		String response = execScript(cmdArr);
+		System.out.println(response);
 
-		try {
-			String command = fittingFile + " " + fileName;
-			Process process = Runtime.getRuntime().exec(command);
-			process.waitFor(); // 等待脚本执行完成
-		} catch (IOException | InterruptedException e) {
-			e.printStackTrace();
+		readEstimatedDate();
+	}
+
+	// data format: "operator index,task index,miss ratio,cache size
+	private void readEstimatedDate(){
+		String output = readFile(cheDataFile);
+
+		estimatedPoints.clear();
+		for(String line : output.split("\n")){
+			String[] items = line.split(",");
+			Integer operator = Integer.parseInt(items[0].trim());
+			Integer task = Integer.parseInt(items[1].trim());
+			Double missRatio = Double.parseDouble(items[2].trim());
+			Long cacheSize = Long.parseLong(items[3].trim());
+
+			Map<Integer, Map<Double, Long>> operatorMap = estimatedPoints.getOrDefault(operator, new HashMap<>());
+			Map<Double, Long> taskMap = operatorMap.getOrDefault(task, new HashMap<>());
+
+			taskMap.put(missRatio, cacheSize);
+			operatorMap.put(task, taskMap);
+			estimatedPoints.put(operator, operatorMap);
 		}
 	}
 
+	private String execFit(String fileName){
+		String exe = fittingFile;
+		String[] cmdArr = new String[] {exe, fileName};
+		return execScript(cmdArr);
+	}
+
 	private String execPythonFile(String file){
-
 		String exe = "python3";
-		String response = null;
 		String[] cmdArr = new String[] {exe, file};
+		return execScript(cmdArr);
+	}
 
+	private String execScript(String[] command){
+		String response = "";
 		try {
-			Process process = Runtime.getRuntime().exec(cmdArr);
+			Process process = Runtime.getRuntime().exec(command);
 			InputStream is = process.getInputStream();
 			DataInputStream dis = new DataInputStream(is);
 			response = dis.readLine();
@@ -183,6 +237,7 @@ public class CacheMissEqnAlgorithm implements Algorithm{
 			e.printStackTrace();
 		}
 		return response;
+
 	}
 
 	private void loadResult(){

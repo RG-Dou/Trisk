@@ -26,7 +26,7 @@ public class CacheMissEqnSimple implements Algorithm{
 	private final String DATA_DIRECT = "/data";
 
 	private long exeTimes = 0;
-	private long WarmUpTimes = 60;
+	private long WarmUpTimes = 4;
 	private final PythonAlgorithm cheModel;
 
 	private Map<Integer, Map<Integer, Map<Double, Long>>> estimatedPoints = new HashMap<>();
@@ -46,7 +46,7 @@ public class CacheMissEqnSimple implements Algorithm{
 		cheDataFile = dataFile + "/points-from-che.data";
 		resultFile = dataPath + "/result.data";
 
-		cheModel = new PythonAlgorithm(metrics, path);
+		cheModel = new PythonAlgorithm(metrics, path+"/../che");
 	}
 
 	public void recreatePath(String path, String directoryName){
@@ -66,6 +66,7 @@ public class CacheMissEqnSimple implements Algorithm{
 	public void init(){
 //		need to compile the c file first.
 		compileFit();
+		cheModel.init();
 
 		publishBasicInfo();
 	}
@@ -73,9 +74,7 @@ public class CacheMissEqnSimple implements Algorithm{
 	private void compileFit(){
 		String[] cmd = new String[] {"gcc", fittingFile+".c", "-o", fittingFile, "-lm"};
 		String msg = execScript(cmd);
-		if (msg.contains("error")){
-			System.out.println("Compile fit.c failed, msg: " + msg);
-		}
+		System.out.println("msg: " + msg);
 	}
 
 	private void publishBasicInfo(){
