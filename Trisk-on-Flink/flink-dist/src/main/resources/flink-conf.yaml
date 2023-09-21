@@ -268,7 +268,7 @@ policy.windowSize: 5000000000
 #trisk.reconfig.type: noop
 trisk.exp.dir: /data/EMM_data/data
 trisk.taskmanager.managed_memory: 3072
-trisk.vScaling.python.path: /home/drg/projects/work3/flink/Trisk/Trisk-on-Flink/tools/algorithm
+trisk.vScaling.python.path: /home/drg/projects/work3/flink/Trisk/Trisk-on-Flink/tools/algorithms/cacheMissEqn
 trisk.config.schedule_interval: 60000
 trisk.config.metrics_interval: 1000
 trisk.simple_test: false

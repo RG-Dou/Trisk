@@ -258,7 +258,7 @@ def init_x0(backlog, total_memory):
         for j in range(0, task_num[i]):
             total_backlog += backlog[i][j]
         for j in range(0, task_num[i]):
-            array.append(int(backlog[i][j] * 1.0 / total_backlog * operator_memory))
+            array.append(backlog[i][j] * 1.0 / total_backlog * operator_memory)
     return array, task_sizes
 
 
@@ -279,7 +279,7 @@ def min_max_latency_main(t, k, backlog, alpha, beta, parameters_cacheMissEqn):
 
 
     # res2 = minimize(fun, x0, method='SLSQP', bounds=tuple(bnds), constraints=con)
-    optimal_size, min_latency = minimize_gradient_descent(fun, x0_array, 5)
+    optimal_size, min_latency = minimize_gradient_descent(fun, x0_array, 1.0)
 
 
     # log.info("Optimization problem :\t{}".format(res2.message))  #
