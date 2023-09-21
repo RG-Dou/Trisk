@@ -31,8 +31,8 @@ init() {
   fi
   EXP_NAME="nexmark-$1"
 
-  AUCTION_S=0
-  PERSON_S=100
+  AUCTION_S=100
+  PERSON_S=3000
   BID_S=$4
   STATE_SIZE=100000
   KEY_SIZE=50000
