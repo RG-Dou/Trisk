@@ -33,4 +33,11 @@ public class Util {
             Thread.sleep(1000/20 - emitTime);
         }
     }
+
+    public static void pause(long emitStartTime, long step) throws InterruptedException {
+        long emitTime = System.currentTimeMillis() - emitStartTime;
+        if (emitTime < 1000/step) {
+            Thread.sleep(1000/step - emitTime);
+        }
+    }
 }

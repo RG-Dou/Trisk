@@ -113,7 +113,6 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         System.out.println("number of events: " + eventsCountSoFar);
 
         while (running) {
-            long emitStartTime = System.currentTimeMillis();
 
             if (count == 20) {
                 // change input rate every 1 second.
@@ -125,8 +124,6 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
             sendEvents(ctx, curRate, "");
 
-            // Sleep for the rest of timeslice if needed
-            Util.pause(emitStartTime);
             count++;
         }
     }
@@ -136,17 +133,15 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         curRate = 500000;
         long startTs = System.currentTimeMillis();
         while ((System.currentTimeMillis() - startTs < warmUpInterval) && warmUp) {
-            long emitStartTime = System.currentTimeMillis();
-
             sendEvents(ctx, curRate, skewField);
-            // Sleep for the rest of timeslice if needed
-            Util.pause(emitStartTime);
         }
     }
 
-    private void sendEvents(SourceContext<Auction> ctx, int curRate, String field){
+    private void sendEvents(SourceContext<Auction> ctx, int curRate, String field) throws InterruptedException {
 
+//      long emitStartTime = System.currentTimeMillis();
         for (int i = 0; i < curRate / 20; i++) {
+            long emitStartTime = System.currentTimeMillis();
             long nextId = nextId();
             Random rnd = new Random(nextId);
 
@@ -173,7 +168,11 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
             ctx.collect(auction);
             eventsCountSoFar++;
+            // Sleep for the rest of timeslice if needed
+            Util.pause(emitStartTime, curRate);
         }
+        // Sleep for the rest of timeslice if needed
+//      Util.pause(emitStartTime);
     }
 
     @Override

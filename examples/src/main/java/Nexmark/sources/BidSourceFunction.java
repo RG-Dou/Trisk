@@ -141,8 +141,9 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     }
 
     private void sendEvents(SourceContext<Bid> ctx, int curRate, String field) throws InterruptedException {
-        long emitStartTime = System.currentTimeMillis();
+//        long emitStartTime = System.currentTimeMillis();
         for (int i = 0; i < curRate / 20; i++) {
+            long emitStartTime = System.currentTimeMillis();
 
             long nextId = nextId();
             Random rnd = new Random(nextId);
@@ -162,9 +163,9 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
 
             ctx.collect(bid);
             eventsCountSoFar++;
+            Util.pause(emitStartTime, curRate);
         }
         // Sleep for the rest of timeslice if needed
-        Util.pause(emitStartTime);
     }
 
     @Override
