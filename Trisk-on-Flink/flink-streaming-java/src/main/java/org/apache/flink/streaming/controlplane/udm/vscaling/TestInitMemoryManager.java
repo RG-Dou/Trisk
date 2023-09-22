@@ -3,6 +3,8 @@ package org.apache.flink.streaming.controlplane.udm.vscaling;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.udm.vscaling.algorithm.Algorithm;
+import org.apache.flink.streaming.controlplane.udm.vscaling.algorithm.CacheMissEqnSimple;
 import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.SlotMetrics;
 import org.apache.flink.streaming.controlplane.udm.vscaling.metrics.TaskMetrics;
 import org.slf4j.Logger;
@@ -22,12 +24,17 @@ public class TestInitMemoryManager extends AbstractMemoryManager {
 	private final long adjustInterval = 60*1000;
 	private boolean onScheduling = false;
 
+	private final String AlgorithmPath = "trisk.vScaling.python.path";
+	private final Algorithm algorithm;
+
 	private ReentrantLock lock = new ReentrantLock();
 
 	public TestInitMemoryManager(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor, configuration);
 		testingThread = new TestingThread();
 		simpleTest = configuration.getBoolean(SIMPLE_TEST, false);
+		String algorithmPath = configuration.getString(AlgorithmPath, "/home/drg/projects/work3/flink/alg-data/");
+		algorithm = new CacheMissEqnSimple(metrics, algorithmPath);
 	}
 
 	@Override
@@ -63,11 +70,12 @@ public class TestInitMemoryManager extends AbstractMemoryManager {
 	}
 
 	private void adjustMemory(){
+		long newSize = 0;
 		for(Map.Entry<Integer, List<SlotMetrics>> entry : metrics.getSlotTMMap().entrySet()){
 			List<SlotMetrics> slots = entry.getValue();
 			for(SlotMetrics slot : slots){
 				long oldSize = slot.getTargetMemSize();
-				long newSize = oldSize + 10;
+				newSize = oldSize + 10;
 				slot.setTargetMemSize(newSize);
 				for(TaskMetrics taskMetrics : slot.getTasks()){
 					taskMetrics.setOptimalAllocation(newSize);
@@ -75,6 +83,7 @@ public class TestInitMemoryManager extends AbstractMemoryManager {
 				metrics.addExpand(slot);
 			}
 		}
+		System.out.println("Incremental Memory: new mem size is " + newSize);
 		onScheduling = true;
 		resizeGroup(new ArrayList<>(metrics.getExpand()));
 	}
@@ -113,6 +122,22 @@ public class TestInitMemoryManager extends AbstractMemoryManager {
 			return flag;
 		}
 
+		public void cacheSizeInit(){
+			for(Map.Entry<Integer, List<SlotMetrics>> entry : metrics.getSlotTMMap().entrySet()){
+				List<SlotMetrics> slots = entry.getValue();
+				long avgSize = 0;
+				System.out.println("Init: average slot size " + avgSize + "M, total memory " + metrics.getTotalMem() + "M, for instance " + entry.getKey());
+				for(SlotMetrics slot : slots){
+					slot.setTargetMemSize(avgSize);
+					for(TaskMetrics taskMetrics : slot.getTasks()){
+						taskMetrics.setOptimalAllocation(avgSize);
+					}
+					metrics.addExpand(slot);
+				}
+			}
+			resizeGroup(new ArrayList<>(metrics.getExpand()));
+		}
+
 		@Override
 		public void run() {
 
@@ -142,6 +167,7 @@ public class TestInitMemoryManager extends AbstractMemoryManager {
 					}
 
 					if(now - adjustTime > adjustInterval && !onScheduling){
+						algorithm.startExec();
 						adjustMemory();
 						adjustTime = now;
 					}
