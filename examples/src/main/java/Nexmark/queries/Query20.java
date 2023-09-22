@@ -119,8 +119,10 @@ public class Query20 {
                     }
                 });
 
+        JoinBidsWithAuctions joinBidsWithAuctions = new JoinBidsWithAuctions();
+        joinBidsWithAuctions.updateRatio = params.getDouble("update_ratio", 1.0);
         DataStream<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> joined = keyedAuctions.connect(keyedBids)
-                .flatMap(new JoinBidsWithAuctions()).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup(groupJoin);
+                .flatMap(joinBidsWithAuctions).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup(groupJoin);
 
         DataStream<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> flatMap = joined
                 .filter(new FilterFunction<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>>() {
@@ -142,7 +144,7 @@ public class Query20 {
 
         // We only store auction message, since in practice, there should be an auction first, followed by bids
         private ValueState<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>> auctionMsg;
-        private double updatePro;
+        public double updateRatio = 0.1;
 
         @Override
         public void open(Configuration parameters) throws Exception {
@@ -152,8 +154,7 @@ public class Query20 {
                             TypeInformation.of(new TypeHint<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>>() {})
                     );
             auctionMsg = getRuntimeContext().getState(auctionDescriptor);
-            updatePro = parameters.getDouble("trisk.query.state_update.ratio", 0.1);
-            System.out.println("State Update Ratio: " + updatePro);
+            System.out.println("State Update Ratio: " + updateRatio);
         }
 
         @Override
@@ -176,7 +177,7 @@ public class Query20 {
                 delay(200_000);
 
             // Ideal Case: manually set the update operation
-            if(Math.random() < updatePro){
+            if(Math.random() < updateRatio){
                 auction.f2 = bid.price;
                 auctionMsg.update(auction);
                 System.out.println("Update the auction");
