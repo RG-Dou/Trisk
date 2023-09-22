@@ -173,7 +173,7 @@ public class Query20 {
             // Ideal Case: manually increase the service time of Task 0.
             int index = getRuntimeContext().getIndexOfThisSubtask();
             if(index == 0)
-                delay(1_000_000);
+                delay(200_000);
 
             // Ideal Case: manually set the update operation
             if(Math.random() < updatePro){
