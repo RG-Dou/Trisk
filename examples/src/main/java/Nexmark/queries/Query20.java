@@ -176,17 +176,17 @@ public class Query20 {
             if(index == 0)
                 delay(200_000);
 
-            // Ideal Case: manually set the update operation
-            if(Math.random() < updateRatio){
-                auction.f2 = bid.price;
-                auctionMsg.update(auction);
-                System.out.println("Update the auction");
-            }
-
             if(auction != null) {
                 Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> tuple =
                         new Tuple14<>(bid.auction, bid.bidder, bid.price, bid.dateTime, bid.extra,
                                 auction.f0, auction.f1, auction.f2, auction.f3, auction.f4, auction.f5, auction.f6, auction.f7, auction.f8);
+
+                // Ideal Case: manually set the update operation
+                if(Math.random() < updateRatio){
+                    auction.f2 = bid.price;
+                    auctionMsg.update(auction);
+                    System.out.println("Update the auction");
+                }
                 out.collect(tuple);
             }
         }
