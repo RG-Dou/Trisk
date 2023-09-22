@@ -80,7 +80,10 @@ public class Query20 {
         auctionSrc.setSkewField("Warmup");
         auctionSrc.setCategory(10);
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keys, skewness, warmUp);
-        bidSrc.setSkewField("Auction");
+
+        // ! when compare CacheMissEqn and Che, for the ideal case, we use the random distribution for , rather than the zipf distribution ("Auction");
+        /* ToDo: change to the zipf distribution */
+        bidSrc.setSkewField("Random");
         if (inputRateSpy) bidSrc.enableInputRateSpy();
 
         DataStream<Auction> auctions = env.addSource(auctionSrc)
@@ -139,6 +142,7 @@ public class Query20 {
 
         // We only store auction message, since in practice, there should be an auction first, followed by bids
         private ValueState<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>> auctionMsg;
+        private double updatePro;
 
         @Override
         public void open(Configuration parameters) throws Exception {
@@ -148,6 +152,8 @@ public class Query20 {
                             TypeInformation.of(new TypeHint<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>>() {})
                     );
             auctionMsg = getRuntimeContext().getState(auctionDescriptor);
+            updatePro = parameters.getDouble("trisk.query.state_update.ratio", 0.1);
+            System.out.println("State Update Ratio: " + updatePro);
         }
 
         @Override
@@ -163,8 +169,19 @@ public class Query20 {
         @Override
         public void flatMap2(Bid bid, Collector<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> out) throws Exception {
             Tuple9<String, String, Long, Long, Long, Long, Long, Long, String> auction = auctionMsg.value();
-//            if(bid.auction == 0)
-//                delay(1_000_000);
+
+            // Ideal Case: manually increase the service time of Task 0.
+            int index = getRuntimeContext().getIndexOfThisSubtask();
+            if(index == 0)
+                delay(1_000_000);
+
+            // Ideal Case: manually set the update operation
+            if(Math.random() < updatePro){
+                auction.f2 = bid.price;
+                auctionMsg.update(auction);
+                System.out.println("Update the auction");
+            }
+
             if(auction != null) {
                 Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> tuple =
                         new Tuple14<>(bid.auction, bid.bidder, bid.price, bid.dateTime, bid.extra,

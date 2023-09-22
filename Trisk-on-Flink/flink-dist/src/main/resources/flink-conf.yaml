@@ -274,6 +274,8 @@ trisk.config.metrics_interval: 1000
 trisk.simple_test: false
 trisk.decay.rate: 0.8
 
+trisk.query.state_update.ratio: 0.1
+
 #==============================================================================
 # Backpressure Configuration
 #==============================================================================
