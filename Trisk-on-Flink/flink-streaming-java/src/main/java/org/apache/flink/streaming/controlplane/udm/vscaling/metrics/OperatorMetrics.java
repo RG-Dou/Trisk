@@ -21,7 +21,9 @@ public class OperatorMetrics {
 
 	// Raw Data
 	private double stateSize;
+	// time reading from the mem
 	private double alpha=0.0;
+	// extra time reading from the disk compared to reading from the mem
 	private double beta=0.0;
 	private double k;
 
