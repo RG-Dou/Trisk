@@ -68,7 +68,7 @@ init() {
 function configApp() {
     echo "INFO: config app block cache size: ${totalCachePerTM}m"
     sed -ri "s|(trisk.taskmanager.managed_memory: )[0-9]*|trisk.taskmanager.managed_memory: $totalCachePerTM|" ${FLINK_DIR}conf/flink-conf.yaml
-    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
+    sed -i "s/^\(trisk.controller: \)\(ElasticMemoryManager\|BlankController\|TestInitMemoryManager\)/\1${Controller}/"  ${FLINK_DIR}conf/flink-conf.yaml
     sed -i "s/^\(trisk.vScaling.python.type: \)\(CacheMissEqn\|Che\)/\1${Algorithm}/"  ${FLINK_DIR}conf/flink-conf.yaml
 }
 
