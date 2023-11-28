@@ -21,18 +21,17 @@ package Nexmark.queries;
 import Nexmark.sinks.DummyLatencyCountingSinkOutput;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.BidSourceFunction;
+import Nexmark.sources.controllers.AuctionSCWarmUpOnly;
 import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
 import org.apache.flink.api.common.functions.FilterFunction;
-import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple14;
-import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.tuple.Tuple9;
 import org.apache.flink.api.java.typeutils.GenericTypeInfo;
 import org.apache.flink.api.java.utils.ParameterTool;
@@ -76,9 +75,10 @@ public class Query20 {
             groupFilter = "unified";
         }
 
-        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, keys, 0, warmUp);
-        auctionSrc.setSkewField("Warmup");
-        auctionSrc.setCategory(10);
+        AuctionSCWarmUpOnly auctionController = new AuctionSCWarmUpOnly(keys * 3);
+        auctionController.setNUM_CATEGORIES(1);
+        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, auctionController);
+
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keys, skewness, warmUp);
 
         // ! when compare CacheMissEqn and Che, for the ideal case, we use the random distribution for , rather than the zipf distribution ("Auction");
@@ -120,7 +120,6 @@ public class Query20 {
                 });
 
         JoinBidsWithAuctions joinBidsWithAuctions = new JoinBidsWithAuctions();
-        joinBidsWithAuctions.updateRatio = params.getDouble("update_ratio", 1.0);
         DataStream<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> joined = keyedAuctions.connect(keyedBids)
                 .flatMap(joinBidsWithAuctions).name("Incremental join").setParallelism(params.getInt("p-join", 1)).slotSharingGroup(groupJoin);
 
@@ -144,7 +143,6 @@ public class Query20 {
 
         // We only store auction message, since in practice, there should be an auction first, followed by bids
         private ValueState<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>> auctionMsg;
-        public double updateRatio = 0.1;
 
         @Override
         public void open(Configuration parameters) throws Exception {
@@ -154,17 +152,15 @@ public class Query20 {
                             TypeInformation.of(new TypeHint<Tuple9<String, String, Long, Long, Long, Long, Long, Long, String>>() {})
                     );
             auctionMsg = getRuntimeContext().getState(auctionDescriptor);
-            System.out.println("State Update Ratio: " + updateRatio);
         }
 
         @Override
         public void flatMap1(Auction auction, Collector<Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String>> out) throws Exception {
             Tuple9<String, String, Long, Long, Long, Long, Long, Long, String> oldValue = auctionMsg.value();
-            if (oldValue == null)
+            if (oldValue == null) {
                 oldValue = new Tuple9<>(auction.itemName, auction.description, auction.initialBid, auction.reserve, auction.dateTime, auction.expires, auction.seller, auction.category, auction.extra);
-            else
-                oldValue.f2 = auction.initialBid;
-            auctionMsg.update(oldValue);
+                auctionMsg.update(oldValue);
+            }
         }
 
         @Override
@@ -180,13 +176,6 @@ public class Query20 {
                 Tuple14<Long, Long, Long, Long, String, String, String, Long, Long, Long, Long, Long, Long, String> tuple =
                         new Tuple14<>(bid.auction, bid.bidder, bid.price, bid.dateTime, bid.extra,
                                 auction.f0, auction.f1, auction.f2, auction.f3, auction.f4, auction.f5, auction.f6, auction.f7, auction.f8);
-
-                // Ideal Case: manually set the update operation
-                if(Math.random() < updateRatio){
-                    auction.f2 = bid.price;
-                    auctionMsg.update(auction);
-                    System.out.println("Update the auction");
-                }
                 out.collect(tuple);
             }
         }

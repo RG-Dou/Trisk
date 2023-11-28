@@ -13,7 +13,6 @@ public class Util {
 
     public static int changeRateSin(int rate, int cycle, int epoch) {
         double sineValue = Math.sin(Math.toRadians(epoch*360/cycle)) + 1;
-        System.out.println(sineValue);
 
         Double curRate = (sineValue * rate);
         return curRate.intValue();

@@ -21,6 +21,7 @@ package Nexmark.queries;
 import Nexmark.sinks.DummyLatencyCountingSinkOutput;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.BidSourceFunction;
+import Nexmark.sources.controllers.AuctionSCWarmUpOnly;
 import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
@@ -43,8 +44,6 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Random;
 
 public class Query4 {
 
@@ -79,8 +78,10 @@ public class Query4 {
             groupWin = "unified";
         }
 
-        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, keySize, 0, warmUp);
-        auctionSrc.setSkewField("Warmup");
+        AuctionSCWarmUpOnly auctionController = new AuctionSCWarmUpOnly(keySize);
+        auctionController.setNUM_CATEGORIES(10);
+        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, auctionController);
+
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keySize, skewness, warmUp);
 //        bidSrc.setSkewField("Auction");
         bidSrc.setSkewField(skewPolicy);

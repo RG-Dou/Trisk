@@ -35,6 +35,9 @@ public class StatisticConfigurableOptionsFactory extends DefaultConfigurableOpti
         currentOptions.setInfoLogLevel(InfoLogLevel.INFO_LEVEL);
         currentOptions.setStatsDumpPeriodSec(5);
         currentOptions.setDbLogDir(dbLogDir);
+        currentOptions
+                .setIncreaseParallelism(4)
+                .setUseFsync(false);
 //        DumpStat dumpStat = new DumpStat(statistics);
 //        dumpStat.start();
 
