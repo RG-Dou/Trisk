@@ -77,8 +77,9 @@ public class Query20 {
 
         AuctionSCWarmUpOnly auctionController = new AuctionSCWarmUpOnly(keys * 3);
         auctionController.setNUM_CATEGORIES(1);
-        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, auctionController);
+        AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, 5000, auctionController);
 
+        // warm up for bid is 5+30s for 0.3GB/task
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keys, skewness, warmUp);
 
         // ! when compare CacheMissEqn and Che, for the ideal case, we use the random distribution for , rather than the zipf distribution ("Auction");

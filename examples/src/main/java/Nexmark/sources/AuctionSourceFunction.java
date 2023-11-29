@@ -58,6 +58,10 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
         this(0, srcBase, 60, 5000, stateSize, auctionSrcController);
     }
 
+    public AuctionSourceFunction(int srcBase, long stateSize, int warmUpInterval, AuctionSrcController auctionSrcController){
+        this(0, srcBase, 60, warmUpInterval, stateSize, auctionSrcController);
+    }
+
     public AuctionSourceFunction(int base, long stateSize, int warmUpInterval){
         this(0, base, 60, warmUpInterval, stateSize, null);
     }
@@ -115,9 +119,9 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     private void sendEvents(SourceContext<Auction> ctx, int curRate) throws InterruptedException {
 
-//      long emitStartTime = System.currentTimeMillis();
+      long emitStartTime = System.currentTimeMillis();
         for (int i = 0; i < curRate / 20; i++) {
-            long emitStartTime = System.currentTimeMillis();
+//            long emitStartTime = System.currentTimeMillis();
             long nextId = nextId();
             Random rnd = new Random(nextId);
 
@@ -132,10 +136,10 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
             ctx.collect(auction);
             eventsCountSoFar++;
             // Sleep for the rest of timeslice if needed
-            Util.pause(emitStartTime, curRate);
+//            Util.pause(emitStartTime, curRate);
         }
         // Sleep for the rest of timeslice if needed
-//      Util.pause(emitStartTime);
+      Util.pause(emitStartTime);
     }
 
     @Override

@@ -5,6 +5,7 @@ import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
 import org.joda.time.Instant;
 
+import java.io.Serializable;
 import java.util.Random;
 
 import static org.apache.beam.sdk.nexmark.sources.generator.model.LongGenerator.nextLong;
@@ -14,7 +15,7 @@ import static org.apache.beam.sdk.nexmark.sources.generator.model.PriceGenerator
 import static org.apache.beam.sdk.nexmark.sources.generator.model.StringsGenerator.nextExtra;
 import static org.apache.beam.sdk.nexmark.sources.generator.model.StringsGenerator.nextString;
 
-public class AuctionSrcController {
+public class AuctionSrcController implements Serializable {
     /**
      * Keep the number of categories small so the example queries will find results even with a small
      * batch of events.
