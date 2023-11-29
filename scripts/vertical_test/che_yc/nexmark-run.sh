@@ -45,7 +45,6 @@ init() {
   JOIN_P=${PP}
   WIN_P=${PP}
   FILTER_P=${PP}
-  UPDATE_RATIO=0.1
 
   runtime=1500
   totalCachePerTM=$7
@@ -54,7 +53,7 @@ init() {
   Try=$5
   Cache_Policy=$8
   Algorithm=$9
-  SUB_DIR=$totalCachePerTM+$Try
+  SUB_DIR=$BID_S+$Try
 
   ROCKSDB_DIR="${DATA_ROOT}/rocksdb-storage"
   ROCKSDB_LOG_DIR=${ROCKSDB_DIR}"/logdir/"
@@ -105,6 +104,7 @@ function cleanEnv() {
 #  mv ${FLINK_DIR}log ${FLINK_DIR}${EXP_NAME}
   mv ${FLINK_DIR}log/* ${DATA_DIR}/${Cache_Policy}/${SUB_DIR}
   mv ${LATENCY_DIR}* ${DATA_DIR}/${Cache_Policy}/${SUB_DIR}
+  cp -r $ROOT/Trisk-on-Flink/tools/tools/algorithms/che/temp/* ${DATA_DIR}/${Cache_Policy}/${SUB_DIR}
   rm -rf /tmp/flink*
   rm ${FLINK_DIR}log/*
 }
@@ -133,9 +133,9 @@ function stopFlink() {
 
 # run applications
 function runApp() {
-  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -update_ratio ${UPDATE_RATIO} &"
+  echo "INFO: $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &"
   rm nohup.out
-  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} -update_ratio ${UPDATE_RATIO} &
+  nohup $FLINK run -c ${JOB} ${JAR} -auction-srcRate ${AUCTION_S} -person-srcRate ${PERSON_S} -bid-srcRate ${BID_S} -p-auction-source ${AUCTION_P} -p-person-source ${PERSON_P} -p-bid-source ${BID_P} -p-join ${JOIN_P} -p-window ${WIN_P} -p-filter ${FILTER_P} -state-size ${STATE_SIZE} -keys ${KEY_SIZE} -group-all ${Group} -skewness ${SKEWNESS} &
 }
 
 function runGenerator() {
