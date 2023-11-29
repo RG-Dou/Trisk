@@ -21,6 +21,7 @@ package Nexmark.queries;
 import Nexmark.sinks.DummyLatencyCountingSink;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.PersonSourceFunction;
+import Nexmark.sources.controllers.AuctionSrcController;
 import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Person;
@@ -86,7 +87,7 @@ public static void main(String[] args) throws Exception {
 
     final long stateSize = params.getLong("state-size", 20);
 
-    DataStream<Auction> auctions = env.addSource(new AuctionSourceFunction(auctionSrcRate, stateSize))
+    DataStream<Auction> auctions = env.addSource(new AuctionSourceFunction(auctionSrcRate, stateSize, new AuctionSrcController()))
             .name("Custom Source: Auctions")
             .setParallelism(params.getInt("p-auction-source", 1)).slotSharingGroup("source")
             .assignTimestampsAndWatermarks(new AuctionTimestampAssigner()).slotSharingGroup("source");
