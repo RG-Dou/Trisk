@@ -19,6 +19,7 @@ public class AuctionSCWarmUpOnly extends AuctionSrcController {
     private long nextID = 0;
 
     private final long keys;
+    private long startTime;
 
     public AuctionSCWarmUpOnly(long keys) {
         this.keys = keys;
@@ -29,12 +30,13 @@ public class AuctionSCWarmUpOnly extends AuctionSrcController {
         index = srcFunction.getRuntimeContext().getIndexOfThisSubtask();
         parallel = srcFunction.getRuntimeContext().getNumberOfParallelSubtasks();
         srcFunction.setBase(500000);
+        startTime = System.currentTimeMillis();
     }
 
     @Override
     public void checkAndAdjust(){
         if(nextID >= keys / parallel) {
-            System.out.println("Stop warm up");
+            System.out.println("Stop warm up, total time is: " + (System.currentTimeMillis() - startTime) + "ms.");
             srcFunction.cancel();
         }
     }
