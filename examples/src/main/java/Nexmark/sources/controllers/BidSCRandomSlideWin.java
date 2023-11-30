@@ -57,13 +57,13 @@ public class BidSCRandomSlideWin extends BidSrcController{
             if (currentWindow.size() > SIZE){
                 currentWindow.remove(0);
             }
-            System.out.println("current window is: " + currentWindow);
         }
     }
 
     @Override
     public Bid nextBid(long eventId, Random random, long timestamp, GeneratorConfig config) {
-        int randomIndex = currentWindow.get(dataGen.nextInt(0, currentWindow.size()));
+        System.out.println("Win:" + currentWindow);
+        int randomIndex = currentWindow.get(dataGen.nextInt(0, currentWindow.size() - 1));
         long start_id = keyPool.get(randomIndex);
         long auction = dataGen.nextLong(start_id, start_id + keysPerStep);
 
