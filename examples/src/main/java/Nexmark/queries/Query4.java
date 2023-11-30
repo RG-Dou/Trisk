@@ -22,6 +22,7 @@ import Nexmark.sinks.DummyLatencyCountingSinkOutput;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.BidSourceFunction;
 import Nexmark.sources.controllers.AuctionSCWarmUpOnly;
+import Nexmark.sources.controllers.BidSCZipf;
 import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
@@ -65,10 +66,7 @@ public class Query4 {
         final long stateSize = params.getLong("state-size", 1_000_000);
         final long keySize = params.getLong("keys", 10000);
         final double skewness = params.getDouble("skewness", 1.0);
-        final boolean inputRateSpy = params.getBoolean("input-spy", false);
         final int winSize = params.getInt("win-size", 1);
-        final String skewPolicy = params.get("skew-policy", "Auction");
-//        int warmUp = 6*60*1000;
 
         int warmUp = 2*180*1000;
         final boolean groupAll = params.getBoolean("group-all", false);
@@ -82,10 +80,8 @@ public class Query4 {
         auctionController.setNUM_CATEGORIES(10);
         AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, auctionController);
 
-        BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keySize, skewness, warmUp);
-//        bidSrc.setSkewField("Auction");
-        bidSrc.setSkewField(skewPolicy);
-        if (inputRateSpy) bidSrc.enableInputRateSpy();
+        BidSCZipf controller = new BidSCZipf(keySize, skewness);
+        BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, warmUp, controller);
 
         DataStream<Auction> auctions = env.addSource(auctionSrc)
                 .name("Custom Source: Auctions")

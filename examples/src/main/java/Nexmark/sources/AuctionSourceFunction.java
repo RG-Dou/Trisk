@@ -21,13 +21,9 @@ package Nexmark.sources;
 import Nexmark.sources.controllers.AuctionSrcController;
 import org.apache.beam.sdk.nexmark.NexmarkConfiguration;
 import org.apache.beam.sdk.nexmark.model.Auction;
-import org.apache.beam.sdk.nexmark.model.Person;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
-import org.apache.beam.sdk.nexmark.sources.generator.model.AuctionGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
-import org.joda.time.DateTime;
 
-import java.util.Objects;
 import java.util.Random;
 
 /**
@@ -91,15 +87,14 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     @Override
     public void run(SourceContext<Auction> ctx) throws Exception {
-
-        controller.beforeRun();
-
         int epoch = 0;
         int count = 0;
         int curRate = rate;
 
         // warm up
         Thread.sleep(warmUpInterval);
+
+        controller.beforeRun();
         while (running) {
 
             if (count == 20) {
@@ -119,7 +114,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 
     private void sendEvents(SourceContext<Auction> ctx, int curRate) throws InterruptedException {
 
-      long emitStartTime = System.currentTimeMillis();
+        long emitStartTime = System.currentTimeMillis();
         for (int i = 0; i < curRate / 20; i++) {
 //            long emitStartTime = System.currentTimeMillis();
             long nextId = nextId();
@@ -139,7 +134,7 @@ public class AuctionSourceFunction extends RichParallelSourceFunction<Auction> {
 //            Util.pause(emitStartTime, curRate);
         }
         // Sleep for the rest of timeslice if needed
-      Util.pause(emitStartTime);
+        Util.pause(emitStartTime);
     }
 
     @Override

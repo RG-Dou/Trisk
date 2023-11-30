@@ -22,6 +22,9 @@ import Nexmark.sinks.DummyLatencyCountingSinkOutput;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.BidSourceFunction;
 import Nexmark.sources.controllers.AuctionSCWarmUpOnly;
+import Nexmark.sources.controllers.BidSCRandom;
+import Nexmark.sources.controllers.BidSCRandomSlideWin;
+import Nexmark.sources.controllers.BidSCZipf;
 import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
@@ -65,9 +68,7 @@ public class Query20 {
         final long stateSize = params.getLong("state-size", 1_000_000);
         final long keys = params.getLong("keys", 10000);
         final double skewness = params.getDouble("skewness", 1.0);
-        final boolean inputRateSpy = params.getBoolean("input-spy", false);
 
-        int warmUp = 2*180*1000;
         final boolean groupAll = params.getBoolean("group-all", false);
         String groupJoin = "join", groupFilter = "Filter";
         if (groupAll){
@@ -79,13 +80,12 @@ public class Query20 {
         auctionController.setNUM_CATEGORIES(1);
         AuctionSourceFunction auctionSrc = new AuctionSourceFunction(auctionSrcRate, stateSize, 5000, auctionController);
 
+//        BidSCZipf controller = new BidSCZipf(keys, skewness);
+//        BidSCRandom controller = new BidSCRandom(keys);
+        BidSCRandomSlideWin controller = new BidSCRandomSlideWin(keys, 30);
+        int warmUp = 35*1000;
         // warm up for bid is 5+30s for 0.3GB/task
-        BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, keys, skewness, warmUp);
-
-        // ! when compare CacheMissEqn and Che, for the ideal case, we use the random distribution for , rather than the zipf distribution ("Auction");
-        /* ToDo: change to the zipf distribution */
-        bidSrc.setSkewField("Random");
-        if (inputRateSpy) bidSrc.enableInputRateSpy();
+        BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, warmUp, controller);
 
         DataStream<Auction> auctions = env.addSource(auctionSrc)
                 .name("Custom Source: Auctions")

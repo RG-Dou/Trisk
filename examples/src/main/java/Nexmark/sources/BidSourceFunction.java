@@ -18,16 +18,13 @@
 
 package Nexmark.sources;
 
-import Nexmark.sources.generator.model.BidGeneratorZipf;
+import Nexmark.sources.controllers.BidSrcController;
 import org.apache.beam.sdk.nexmark.NexmarkConfiguration;
-import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
 import org.apache.beam.sdk.nexmark.sources.generator.GeneratorConfig;
-import org.apache.beam.sdk.nexmark.sources.generator.model.BidGenerator;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 import org.joda.time.DateTime;
 
-import java.util.Objects;
 import java.util.Random;
 
 /**
@@ -40,13 +37,13 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     private long eventsCountSoFar = 0;
     private int rate;
     private int cycle = 60;
+
     private int base = 0;
     private int warmUpInterval = 100000;
-    private BidGeneratorZipf zipf;
-    private String skewField;
 
-    private String skewFieldWarm;
     private Boolean inputRateSpy = false;
+
+    private final BidSrcController controller;
 
     public BidSourceFunction(int srcRate) {
         this(srcRate, 0);
@@ -57,26 +54,14 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     }
 
     public BidSourceFunction(int srcRate, int base, int cycle) {
-        this(srcRate, base, cycle, 400000);
+        this(srcRate, base, cycle, 400000, new BidSrcController());
     }
 
-    public BidSourceFunction(int srcRate, int base, int cycle, int warmUpInterval) {
-        this(srcRate, base, cycle, warmUpInterval, 10000,  1.0);
+    public BidSourceFunction(int base, int warmUpInterval, BidSrcController controller){
+        this(0, base, 60, warmUpInterval, controller);
     }
 
-    public BidSourceFunction(int base, long keys) {
-        this(base, keys, 1.0);
-    }
-
-    public BidSourceFunction(int base, long keys, double skewness){
-            this(base, keys, skewness, 400000);
-    }
-
-    public BidSourceFunction(int base, long keys, double skewness, int warmUpInterval){
-        this(0, base, 60, warmUpInterval, keys, skewness);
-    }
-
-    public BidSourceFunction(int srcRate, int base, int cycle, int warmUpInterval, long keys, double skewness){
+    public BidSourceFunction(int srcRate, int base, int cycle, int warmUpInterval, BidSrcController controller){
         this.rate = srcRate;
         this.cycle = cycle;
         this.base = base;
@@ -84,63 +69,38 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
         NexmarkConfiguration nexconfig = NexmarkConfiguration.DEFAULT;
         nexconfig.hotAuctionRatio=1;
         config = new GeneratorConfig(nexconfig, 1, 1000L, 0, 1);
-        zipf = new BidGeneratorZipf(keys, skewness);
+        this.controller = controller;
     }
 
 
     @Override
     public void run(SourceContext<Bid> ctx) throws Exception {
-        long streamStartTime = System.currentTimeMillis();
         int epoch = 0;
         int count = 0;
         int curRate = base + rate;
 
         // warm up
-        Thread.sleep(10000);
         Thread.sleep(warmUpInterval);
-//        warmup(ctx);
 
-        long startTs = System.currentTimeMillis();
-        long newStartTs = startTs;
-
-        System.out.println("Warm up phase 2");
-        curRate = curRate * 3 / 5;
+        controller.beforeRun();
         while (running) {
-            if (System.currentTimeMillis() - startTs < warmUpInterval / 4) {
-                //Read Warm up
+
+            if (count == 20) {
+                // change input rate every 1 second.
+                epoch++;
+                curRate = base + Util.changeRateSin(rate, cycle, epoch);
                 System.out.println("Bid: epoch: " + epoch % cycle + " current rate is: " + curRate);
-                sendEvents(ctx, curRate, skewFieldWarm);
-            } else { // after warm up
-                if (count == 20) {
-                    // change input rate every 1 second.
-                    epoch++;
-                    curRate = base + Util.changeRateSin(rate, cycle, epoch);
-                    System.out.println("Bid: epoch: " + epoch % cycle + " current rate is: " + curRate);
-                    count = 0;
-                }
-
-                if(inputRateSpy) {
-                    if(System.currentTimeMillis() - newStartTs >= 60*1000){
-                        newStartTs = System.currentTimeMillis();
-                        base = base + 50;
-                    }
-                }
-
-                sendEvents(ctx, curRate, skewField);
-                count++;
+                count = 0;
             }
+
+            sendEvents(ctx, curRate);
+            count++;
+
+            controller.checkAndAdjust();
         }
     }
 
-    private void warmup(SourceContext<Bid> ctx) throws InterruptedException {
-        int curRate = rate + base/10; //  (sin0 + 1)
-        long startTs = System.currentTimeMillis();
-        while (System.currentTimeMillis() - startTs < warmUpInterval) {
-            sendEvents(ctx, curRate, skewFieldWarm);
-        }
-    }
-
-    private void sendEvents(SourceContext<Bid> ctx, int curRate, String field) throws InterruptedException {
+    private void sendEvents(SourceContext<Bid> ctx, int curRate) throws InterruptedException {
 //        long emitStartTime = System.currentTimeMillis();
         for (int i = 0; i < curRate / 20; i++) {
             long emitStartTime = System.currentTimeMillis();
@@ -152,16 +112,9 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
 //            long eventTimestamp =
 //                    config.timestampAndInterEventDelayUsForEvent(
 //                            config.nextEventNumber(eventsCountSoFar)).getKey();
-            Bid bid;
-            if (Objects.equals(field, "Auction")){
-                bid = zipf.nextBidAucSkew(nextId, rnd, DateTime.now().getMillis(), config);
-            } else if (Objects.equals(field, "Random")){
-                bid = zipf.nextBidRandom(nextId, rnd, DateTime.now().getMillis(), config);
-            } else {
-                bid = zipf.nextBid(nextId, rnd, DateTime.now().getMillis(), config);
-            }
-
+            Bid bid = controller.nextBid(nextId, rnd, DateTime.now().getMillis(), config);
             ctx.collect(bid);
+
             eventsCountSoFar++;
             Util.pause(emitStartTime, curRate);
         }
@@ -178,15 +131,11 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
 //        return config.firstEventId + eventsCountSoFar;
     }
 
-    public void setSkewField(String skewField) {
-        this.skewField = skewField;
+    public int getBase() {
+        return base;
     }
 
-    public void setSkewFieldWarm(String skewFieldWarm) {
-        this.skewFieldWarm = skewFieldWarm;
-    }
-
-    public void enableInputRateSpy(){
-        this.inputRateSpy = true;
+    public void setBase(int base) {
+        this.base = base;
     }
 }
