@@ -70,6 +70,7 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
         nexconfig.hotAuctionRatio=1;
         config = new GeneratorConfig(nexconfig, 1, 1000L, 0, 1);
         this.controller = controller;
+        this.controller.function = this;
     }
 
 
@@ -140,4 +141,9 @@ public class BidSourceFunction extends RichParallelSourceFunction<Bid> {
     public void setBase(int base) {
         this.base = base;
     }
+
+    public long getEventsCountSoFar() {
+        return eventsCountSoFar;
+    }
+
 }

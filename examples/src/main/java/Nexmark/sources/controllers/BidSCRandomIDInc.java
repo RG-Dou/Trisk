@@ -6,67 +6,41 @@ import org.apache.beam.sdk.nexmark.sources.generator.model.PriceGenerator;
 import org.apache.commons.math3.random.RandomDataGenerator;
 import org.joda.time.Instant;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 import static org.apache.beam.sdk.nexmark.sources.generator.model.PersonGenerator.lastBase0PersonId;
 import static org.apache.beam.sdk.nexmark.sources.generator.model.PersonGenerator.nextBase0PersonId;
 import static org.apache.beam.sdk.nexmark.sources.generator.model.StringsGenerator.nextExtra;
 
-public class BidSCRandomSlideWin extends BidSrcController{
+public class BidSCRandomIDInc extends BidSrcController {
 
-    // one window size is 0.5 min.
-    private final long ONE_WIN = 30 * 1000;
-    private final long SIZE = 10;
-    private final long STEP = 1;
+    private final long total_keys;
+    private final long key_length;
+    private final double probability;
 
-    private final long totalWindows;
-    private final long keysPerStep;
-    private final List<Long> keyPool= new ArrayList<>();
-
-    private int currentIndex = 0;
-    private long lastTime;
-    private ArrayList<Integer> currentWindow = new ArrayList<>();
+    private long start_id;
 
     private static final RandomDataGenerator dataGen = new RandomDataGenerator();
 
-    public BidSCRandomSlideWin(long keys, int totalWindows) {
-        this.totalWindows = totalWindows;
-        this.keysPerStep = keys / (SIZE / STEP);
-
-        System.out.println("key per window size is: " + keysPerStep);
-        for (long i = 0; i < totalWindows; i ++){
-            keyPool.add(keysPerStep * i);
-        }
-    }
-
-    @Override
-    public void beforeRun(){
-        lastTime = System.currentTimeMillis();
-        currentWindow.add(currentIndex);
+    public BidSCRandomIDInc(long total_keys, long key_length, double probability){
+        this.total_keys = total_keys;
+        this.key_length = key_length;
+        this.probability = probability;
+        start_id = 0;
     }
 
     @Override
     public void checkAndAdjust(){
-        long now = System.currentTimeMillis();
-        System.out.println("now: " + now + ", # events so far: " + function.getEventsCountSoFar() + ", currentWindow: " + currentWindow);
-        if (now - lastTime > ONE_WIN){
-            currentIndex += 1;
-            currentIndex %= totalWindows;
-            currentWindow.add(currentIndex);
-            if (currentWindow.size() > SIZE){
-                currentWindow.remove(0);
-            }
-            lastTime = now;
-        }
+        System.out.println("start ID: " + start_id);
     }
 
     @Override
     public Bid nextBid(long eventId, Random random, long timestamp, GeneratorConfig config) {
-        int randomIndex = currentWindow.get(dataGen.nextInt(0, currentWindow.size() - 1));
-        long start_id = keyPool.get(randomIndex);
-        long auction = dataGen.nextLong(start_id, start_id + keysPerStep);
+        double randomValue = dataGen.nextUniform(0, 1);
+        if (randomValue < probability)
+            start_id += 1;
+
+        long auction = dataGen.nextLong(start_id, start_id + key_length);
 
         long bidder;
         // Here P(bid will be by a hot bidder) = 1 - 1/hotBiddersRatio
@@ -84,6 +58,4 @@ public class BidSCRandomSlideWin extends BidSrcController{
         String extra = nextExtra(random, currentSize, config.getAvgBidByteSize());
         return new Bid(auction, bidder, price, new Instant(timestamp).getMillis(), extra);
     }
-
-
 }

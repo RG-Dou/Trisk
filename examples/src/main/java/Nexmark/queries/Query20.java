@@ -21,10 +21,7 @@ package Nexmark.queries;
 import Nexmark.sinks.DummyLatencyCountingSinkOutput;
 import Nexmark.sources.AuctionSourceFunction;
 import Nexmark.sources.BidSourceFunction;
-import Nexmark.sources.controllers.AuctionSCWarmUpOnly;
-import Nexmark.sources.controllers.BidSCRandom;
-import Nexmark.sources.controllers.BidSCRandomSlideWin;
-import Nexmark.sources.controllers.BidSCZipf;
+import Nexmark.sources.controllers.*;
 import Nexmark.windowing.*;
 import org.apache.beam.sdk.nexmark.model.Auction;
 import org.apache.beam.sdk.nexmark.model.Bid;
@@ -82,7 +79,8 @@ public class Query20 {
 
 //        BidSCZipf controller = new BidSCZipf(keys, skewness);
 //        BidSCRandom controller = new BidSCRandom(keys);
-        BidSCRandomSlideWin controller = new BidSCRandomSlideWin(keys, 30);
+//        BidSCRandomSlideWin controller = new BidSCRandomSlideWin(keys, 30);
+        BidSCRandomIDInc controller = new BidSCRandomIDInc(3 * keys, keys, 0.1);
         int warmUp = 35*1000;
         // warm up for bid is 5+30s for 0.3GB/task
         BidSourceFunction bidSrc = new BidSourceFunction(bidSrcRate, warmUp, controller);
